@@ -85,12 +85,34 @@ notes = ["Depends on epic-contas-acesso entry 1 (2.1), which stands up the `prof
 references = ["ARCHITECTURE-SPINE.md#ad-1", "ARCHITECTURE-SPINE.md#stack"]
 
 [[entry]]
+id = 10
+type = "story"
+title = "Admin SPA: manage Albums, Songs, and genres"
+description = "Builds the Staff-only /admin screens (per the admin.html mockup) wiring entries 1, 2, 3, and 5 into the SPA: create/edit/hide Albums and Songs, assign Songs, upload album art, and manage the genre list."
+verify = "Staff uses the /admin screens to create an Album, edit it, add a Song, hide it, upload its art, and manage the genre list — no direct API calls needed; a non-Staff User cannot reach /admin in the SPA at all."
+after = [1, 2, 3, 5]
+hitl = false
+risk = "medium"
+references = ["../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/admin.html"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Search bar and dropdown UI"
+description = "Adds the search bar and results dropdown to the SPA (per the busca.html mockup), calling entry 7's search endpoint and opening the selected Album, Song, or User's page."
+verify = "Typing in the search bar shows a dropdown of matching Albums, Songs, and Users; selecting one navigates to its page; there is no separate results page or URL, matching the SPEC constraint."
+after = [7]
+hitl = false
+risk = "low"
+references = ["../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/busca.html"]
+
+[[entry]]
 id = 8
 type = "story"
 title = "Refactor sweep"
 description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
 verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
-after = [1, 2, 3, 4, 5, 6, 7]
+after = [1, 2, 3, 4, 5, 6, 7, 10, 11]
 hitl = false
 risk = "low"
 

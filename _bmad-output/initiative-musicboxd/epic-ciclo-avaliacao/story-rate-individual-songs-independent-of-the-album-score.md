@@ -14,13 +14,18 @@ risk: medium
 
 ## Description
 
-Adds song_rating (user+song unique, same 0..10 representation) with its own create/update/delete endpoints, entirely independent of whether the Album has a Score.
+Adds song_rating (user+song unique, same 0..10 representation, with a `created_at` bumped to now on every update, matching entry 1's rule) with its own create/update/delete endpoints, entirely independent of whether the Album has a Score.
 
 ## Acceptance Criteria
 
-Verify: A User rates a Song with no Album Score set, and the Album stays un-Logged; the Album's own Score field, read alongside this, is exactly what entry 1 set — never a value derived from Song Ratings.
+Verify: A User rates a Song with no Album Score set, and the Album stays un-Logged; the Album's own Score field, read alongside this, is exactly what entry 1 set — never a value derived from Song Ratings; updating an existing Song Rating sets a new `created_at`.
 
 ## References
 
 - parent — _bmad-output/initiative-musicboxd/epic-ciclo-avaliacao/epic-ciclo-avaliacao.md
 - ARCHITECTURE-SPINE.md#ad-4
+- ARCHITECTURE-SPINE.md#ad-3
+
+## Notes
+
+- Decision: `created_at` bumps on update, matching entry 1 — needed for epic-social-feed's Feed ordering (AD-3), 2026-09-27.

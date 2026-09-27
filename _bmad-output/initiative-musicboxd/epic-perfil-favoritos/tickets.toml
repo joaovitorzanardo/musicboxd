@@ -49,12 +49,23 @@ notes = ["Introduces the `feed` module and its read-only DB role (SELECT on prof
 references = ["ARCHITECTURE-SPINE.md#ad-3"]
 
 [[entry]]
+id = 7
+type = "story"
+title = "Profile page UI: identity, favorites, favorite genres"
+description = "Builds the Profile page UI (per the perfil.html mockup) wiring entries 1 (avatar/cover/bio), 2 (favorite genres), 3 (5+5 favorites), and 4 (public assembled view) into the SPA. epic-social-feed later extends this same page with the Follow button and lists, so this ticket leaves visible room for that but does not build it."
+verify = "A User edits their own avatar, cover, bio, favorite genres, and orders their 5+5 Favorites entirely through the SPA; a Guest opens any Profile URL and sees the full rendered page with no direct API call needed to inspect it."
+after = [1, 2, 3, 4]
+hitl = false
+risk = "medium"
+references = ["../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/perfil.html"]
+
+[[entry]]
 id = 5
 type = "story"
 title = "Refactor sweep"
 description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
 verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
-after = [1, 2, 3, 4]
+after = [1, 2, 3, 4, 7]
 hitl = false
 risk = "low"
 

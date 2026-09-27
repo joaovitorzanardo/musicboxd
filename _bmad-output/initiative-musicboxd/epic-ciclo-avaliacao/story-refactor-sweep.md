@@ -6,7 +6,7 @@ id: 7
 type: story
 title: "Refactor sweep"
 parent: epic-ciclo-avaliacao
-after: [1, 2, 3, 4, 5, 6]
+after: [1, 2, 3, 4, 5, 6, 9]
 risk: low
 ---
 

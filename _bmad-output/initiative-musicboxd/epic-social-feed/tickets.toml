@@ -1,0 +1,58 @@
+# tickets.toml — epic-social-feed's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: social (1), feed (2), guest boundary (3) — converging at the sweep.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: Follow and unfollow, with computed counts"
+description = "Adds the social schema (follow: follower_id/followee_id unique pair), endpoints to Follow and unfollow, and follower/following list and count queries — counts are always computed at read time, never stored (AD-13) — and adds the Follow/unfollow button and follower/following lists to the Profile page the SPA already renders (epic-perfil-favoritos), since that page is where this action lives."
+verify = "A User follows and unfollows another User via a button on their Profile page; both users' lists and counts update immediately and match, visible on their Profile pages with no direct API call; a caller can only remove their own follow edge, never another user's, even if a followee/follower id is supplied."
+after = ["2.1", "5.7"]
+hitl = false
+risk = "medium"
+notes = ["Extends the Profile page UI (epic-perfil-favoritos entry 7) with the Follow button and lists — that epic's Boundaries already deferred this to avoid re-touching the page twice."]
+references = ["ARCHITECTURE-SPINE.md#ad-13"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Feed: recent Ratings and Reviews from followed Users, cursor-paginated"
+description = "Extends the `feed` module (introduced in epic-perfil-favoritos entry 4) with the Feed query: a read-only, indexed cross-schema JOIN across `social`, `ratings`, `reviews` returning Album and Song Ratings (with Review text where one exists) from Users the caller follows, newest first, cursor-paginated on (created_at DESC, id DESC), computed at read time with no precomputed table. Extends the `feed` DB role's grants to include SELECT on the `social` schema this epic's entry 1 introduces."
+verify = "After Marina rates an Album, a follower's Feed shows it at the top; Ratings from unfollowed Users never appear; re-rating an already-Rated Album/Song (whose created_at just bumped) reappears at the top as new activity; paging by the cursor returns no duplicates and no gaps; the query plan shows index use on the cursor columns, not a sequential scan."
+after = [1, "4.1", "4.3", "4.4", "5.4"]
+hitl = false
+risk = "medium"
+notes = ["Depends on epic-ciclo-avaliacao entries 1 and 3 carrying the created_at-bumps-on-update fix (2026-09-27) — without it, re-rating would not resurface in this Feed."]
+references = ["ARCHITECTURE-SPINE.md#ad-3"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Feed page UI, and the Guest boundary"
+description = "Builds the Feed screen (per feed.html) wiring entry 2's query into the SPA with infinite/cursor scroll; a logged-out visitor sees only a message inviting sign-up and follow, with no Rating items, instead of an error or an empty-looking feed — the API route itself also requires authentication."
+verify = "A logged-in User scrolls their Feed, seeing followed Users' Ratings and Reviews newest first, loading more via the cursor with no direct API call; a logged-out visitor at the Feed route sees the sign-up/follow message and zero Rating items; the underlying API call is never made unauthenticated, or is rejected cleanly if it is."
+after = [2]
+hitl = false
+risk = "medium"
+references = ["../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/feed.html"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 5
+type = "story"
+title = "Closing end-to-end suite: social and feed proven together"
+description = "One end-to-end suite proving follow/unfollow with counts, the Feed showing followed Users' activity newest-first with re-rating resurfacing it, and the Guest boundary, together, against the deployed production stack."
+verify = "The suite runs against production and passes every Done when check in the epic in one pass — the initiative's own tracer path, completed."
+after = [4, "1.6"]
+hitl = false
+risk = "low"

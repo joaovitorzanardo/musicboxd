@@ -70,12 +70,23 @@ notes = ["High risk check: a person retries the event publish and confirms idemp
 references = ["ARCHITECTURE-SPINE.md#ad-2"]
 
 [[entry]]
+id = 9
+type = "story"
+title = "Album/Song page UI: rate, review, listenlist"
+description = "Builds the Album and Song page UI (per the album.html and musica.html mockups) wiring entries 1 (score), 2 (delete score), 3 (song ratings), 4 (review CRUD+read), and 5 (listenlist add/remove) into the SPA."
+verify = "From the Album page, a User sets/changes/deletes an Album Score, writes/edits/deletes a Review, and adds/removes it from their Listenlist; from a Song's row, a User rates that Song independently — none of it needs a direct API call."
+after = [1, 2, 3, 4, 5]
+hitl = false
+risk = "medium"
+references = ["../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/album.html", "../../planning-artifacts/ux-designs/ux-teste-2026-09-26/mockups/musica.html"]
+
+[[entry]]
 id = 7
 type = "story"
 title = "Refactor sweep"
 description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
 verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
-after = [1, 2, 3, 4, 5, 6]
+after = [1, 2, 3, 4, 5, 6, 9]
 hitl = false
 risk = "low"
 

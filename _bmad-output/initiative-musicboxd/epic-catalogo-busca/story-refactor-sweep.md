@@ -6,7 +6,7 @@ id: 8
 type: story
 title: "Refactor sweep"
 parent: epic-catalogo-busca
-after: [1, 2, 3, 4, 5, 6, 7]
+after: [1, 2, 3, 4, 5, 6, 7, 10, 11]
 risk: low
 ---
 
