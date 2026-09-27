@@ -1,0 +1,49 @@
+# tickets.toml — initiative-musicboxd's epics, in build order.
+# id is stable and never reused; table order is build order.
+
+[[epic]]
+id = 1
+slug = "epic-plataforma-base"
+title = "Platform baseline"
+covers = []
+
+[[epic]]
+id = 2
+slug = "epic-contas-acesso"
+title = "Accounts and access"
+covers = ["CAP-1", "CAP-2"]
+after = [{ epic = 1, needs = "deployed API/SPA skeleton, CI, and the EC2/Compose/nginx/TLS runtime to ship into" }]
+
+[[epic]]
+id = 3
+slug = "epic-catalogo-busca"
+title = "Catalog and search"
+covers = ["CAP-3", "CAP-4"]
+after = [{ epic = 2, needs = "the USER/STAFF role claim and auth middleware to gate /api/v1/admin/**" }]
+
+[[epic]]
+id = 4
+slug = "epic-ciclo-avaliacao"
+title = "Core loop: rate, review, listenlist"
+covers = ["CAP-5", "CAP-6", "CAP-7", "CAP-8"]
+after = [{ epic = 3, needs = "Albums and Songs to rate, review, and listenlist" }]
+
+[[epic]]
+id = 5
+slug = "epic-perfil-favoritos"
+title = "Profile and favorites"
+covers = ["CAP-11", "CAP-12", "CAP-13"]
+after = [
+  { epic = 3, needs = "the uploads/S3 presign flow, first built for album art" },
+  { epic = 4, needs = "a User's Ratings and Reviews to show on the public Profile" },
+]
+
+[[epic]]
+id = 6
+slug = "epic-social-feed"
+title = "Social: follow and feed"
+covers = ["CAP-9", "CAP-10"]
+after = [
+  { epic = 4, needs = "Ratings to surface in the Feed" },
+  { epic = 5, needs = "the Profile view feed assembles into (follower/following lists shown there)" },
+]

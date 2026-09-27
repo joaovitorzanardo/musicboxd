@@ -1,0 +1,130 @@
+# tickets.toml — epic-plataforma-base's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: app (1,2,3,6) and infra (4,5,7,8); 9 bridges both.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: API, SPA, and local Compose talk to each other"
+description = "Scaffolds api/, web/, deploy/ per the architecture layout, with a minimal Spring Boot health endpoint, a minimal React SPA screen, and a docker-compose.yml running api+postgres+nginx locally."
+verify = "Running `docker compose up` locally serves the SPA, which calls the API's health endpoint through nginx and shows the result."
+after = []
+hitl = true
+risk = "low"
+references = ["ARCHITECTURE-SPINE.md#structural-seed"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "OpenAPI scaffold and generated TypeScript client"
+description = "Adds springdoc-openapi to the API so it serves an OpenAPI document, and wires the SPA's build to generate its TypeScript client from that document."
+verify = "The API serves a valid OpenAPI JSON at its docs path, and the SPA build regenerates a matching TypeScript client with no manual edits."
+after = [1]
+hitl = false
+risk = "low"
+references = ["ARCHITECTURE-SPINE.md#ad-7"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "CI builds and publishes arm64 images to GHCR"
+description = "GitHub Actions builds the api and web images for arm64 on every push to main and pushes them to GitHub Container Registry."
+verify = "A push to main produces a new arm64 image tag in GHCR for both api and web, visible in the registry."
+after = [1]
+hitl = true
+risk = "medium"
+notes = ["Registry: GHCR (user's decision, 2026-09-27) — simpler token-based auth, no extra AWS IAM."]
+
+[[entry]]
+id = 4
+type = "story"
+title = "EC2 host, IAM role, and network provisioned"
+description = "Provisions the t4g.small EC2 instance, an IAM role scoped to the image bucket, backup bucket, and presigning, and a security group that opens only 80/443 publicly."
+verify = "The instance is reachable only on 80/443 from the internet; SSM session or IP-restricted SSH is the only shell access; the IAM role grants nothing beyond the image bucket, backup bucket, and presigning."
+after = []
+hitl = true
+risk = "medium"
+unknown = "This ticket scopes the IAM role to the image bucket by name/ARN before epic-catalogo-busca actually creates that bucket and its policy (AD-9). Reserve the bucket name now and hand it to that epic, or grant the role access to the bucket's future ARN pattern; either way, coordinate with epic-catalogo-busca's first S3 story."
+references = ["ARCHITECTURE-SPINE.md#ad-11"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Production Compose stack behind nginx TLS"
+description = "Deploys the api/postgres/nginx Compose stack to the EC2 host, with nginx terminating TLS via certbot against a placeholder domain, auto-renewing and reloading nginx on renewal."
+verify = "The placeholder domain serves the SPA over HTTPS from the EC2 host with a valid certificate that renews automatically and reloads nginx."
+after = [4, 1]
+hitl = true
+risk = "medium"
+unknown = "Production domain is not yet decided (user's call, 2026-09-27); this ticket uses a placeholder domain, and the cert plus SPA/CORS origin get swapped once a real one is chosen — that swap is not this ticket's work."
+references = ["ARCHITECTURE-SPINE.md#ad-11", "ARCHITECTURE-SPINE.md#stack"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "CD deploys CI images to the EC2 host"
+description = "Extends the GitHub Actions workflow to pull the newly published GHCR images onto the EC2 host and restart the Compose stack after each successful CI build."
+verify = "A push to main results in the EC2 host running the new image tags within the workflow's run, with no manual step."
+after = [3, 5]
+hitl = true
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Postgres backups to S3 and an exercised restore"
+description = "Adds a scheduled pg_dump from the production Postgres container to S3 with bounded retention, and exercises one full restore from a backup."
+verify = "A backup file appears in S3 on schedule, and a restore from it into a fresh Postgres actually completes with the same data."
+after = [5]
+hitl = true
+risk = "high"
+notes = ["High risk check: a person confirms the restored data matches the source before this ticket closes."]
+references = ["ARCHITECTURE-SPINE.md#ad-11"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "AWS Budgets alerts at 50/80/100%"
+description = "Configures an AWS Budget for the account with alert thresholds at 50%, 80%, and 100%, emailing the owner."
+verify = "A test or simulated threshold crossing sends an alert email to the configured address."
+after = [4]
+hitl = true
+risk = "low"
+references = ["ARCHITECTURE-SPINE.md#ad-10"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Rate limiting: nginx per-IP and a generic Spring per-user limiter"
+description = "Adds an nginx limit_req zone for all routes plus request body and upload size caps, and a reusable Spring per-user rate-limit mechanism that later epics apply to login, registration, email sending, and upload-URL issuance."
+verify = "A burst of requests from one IP is throttled by nginx, an oversized request body is rejected, and a demo endpoint using the Spring limiter rejects a caller past its configured per-user limit."
+after = [2, 5]
+hitl = false
+risk = "medium"
+notes = [
+  "This ticket builds the generic per-user limiter mechanism only; epic-contas-acesso and epic-catalogo-busca apply it to their specific endpoints when those exist.",
+  "Depends on entry 2 (OpenAPI scaffold) because the demo endpoint proving the per-user limiter rides the established OpenAPI/generated-client pipeline (AD-7), not a one-off route.",
+  "AD-10's request-body and upload-size caps are covered here as generic guardrails; upload-specific limits (avatar/cover/album-art byte sizes) are epic-catalogo-busca's and epic-perfil-favoritos's own concern.",
+]
+references = ["ARCHITECTURE-SPINE.md#ad-10"]
+
+[[entry]]
+id = 10
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Closing end-to-end suite: platform baseline proven together"
+description = "One end-to-end suite that proves the whole platform baseline together: SPA reaches the API through nginx TLS on the EC2 host, Postgres backs up and restores, and budgets and rate limits are live."
+verify = "The suite runs against the deployed production stack and passes every Done when check in one pass."
+after = [10]
+hitl = false
+risk = "low"
+notes = ["Closing e2e suite offered per ordering rule and approved by user, 2026-09-27 — the SPEC has no formal test plan for this epic."]
