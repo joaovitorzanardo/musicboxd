@@ -1,5 +1,7 @@
 ---
-tracker_id: ""
+tracker_id: "MBD-37"
+remote: "https://joaovitorzanardoorg-1788391142221.atlassian.net/browse/MBD-37"
+tracker_status: "backlog"
 key: ""
 type: epic
 title: "Core loop: rate, review, listenlist"

@@ -1,0 +1,90 @@
+# tickets.toml — epic-ciclo-avaliacao's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: ratings-core (1,2,3), reviews (4), listenlist (5,6), converging at the sweep.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: score an Album, see it Logged"
+description = "Adds the ratings schema (album_rating: user+album unique, integer 0..10 with a CHECK, per AD-5), an endpoint to create/update a User's own Album Score (API takes 0..5 in 0.5 steps, converts at the edge), and a query returning whether the caller has Logged a given Album."
+verify = "A User gives an Album a Score of 4.5 and it reads back as 4.5 and Logged; 5.3 and -1 are both rejected; the row is unique per (user, album)."
+after = ["3.1"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-4", "ARCHITECTURE-SPINE.md#ad-5"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Delete an Album Score un-Logs the Album"
+description = "Adds an endpoint for a User to delete their own Album Score, a real DELETE (AD-6's hard-delete convention), which un-Logs the Album for them."
+verify = "After deleting the Score, the Album is no longer Logged for that User; the User can then set a new Score on the same Album."
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 3
+type = "story"
+title = "Rate individual Songs, independent of the Album Score"
+description = "Adds song_rating (user+song unique, same 0..10 representation) with its own create/update/delete endpoints, entirely independent of whether the Album has a Score."
+verify = "A User rates a Song with no Album Score set, and the Album stays un-Logged; the Album's own Score field, read alongside this, is exactly what entry 1 set — never a value derived from Song Ratings."
+after = [1, "3.2"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-4"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Write, edit, and delete a Review — owner-only, with a public read"
+description = "Adds reviews (one per user per album, AD-6) with create/edit/(hard-)delete endpoints, each verifying the caller's token matches the Review's author before allowing the write — the first application of this epic's AD-8 resource-ownership rule — plus a public read endpoint (list reviews by album; a user's own review) that the Album page and Profile need to display it."
+verify = "A User writes, edits, and deletes their own Review; a different User's token gets 403 on edit or delete of that same Review, called directly against the API, not only blocked by the UI; a Guest can read an Album's reviews and a User's reviews with no token."
+after = ["3.1"]
+hitl = false
+risk = "high"
+notes = ["High risk check: a person confirms User B cannot edit or delete User A's Review through a direct API call, not just through the SPA, before merge."]
+references = ["ARCHITECTURE-SPINE.md#ad-6", "ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Manage a public Listenlist"
+description = "Adds listenlist_item (owner-only add/remove, AD-8 ownership check applied) for a User's public list of Albums they want to listen to."
+verify = "A User adds and removes an Album from their own Listenlist; a different User's token gets 403 removing an item that isn't theirs; the list is visible to a Guest."
+after = ["3.1"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Scoring an Album reacts on the Listenlist (AD-2 domain event)"
+description = "Publishes an in-process 'album scored' event from entry 1's write path; listenlist consumes it in the same transaction to remove that Album from the scoring User's Listenlist, and rejects adding an already-Logged Album."
+verify = "Scoring a Listenlisted Album removes it from the Listenlist in the same commit; adding an already-Logged Album to the Listenlist is rejected; retrying the event publish does not double-remove or corrupt state; forcing the listener to throw rolls back the Album Score write too (fails closed, AD-2) — the User is not left Logged with a stale Listenlist entry."
+after = [1, 5]
+hitl = false
+risk = "high"
+notes = ["High risk check: a person retries the event publish and confirms idempotency (no double effect, no lost removal); a person also forces a listener exception and confirms the whole transaction, including the rating write, rolls back — not just the Listenlist side."]
+references = ["ARCHITECTURE-SPINE.md#ad-2"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3, 4, 5, 6]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Closing end-to-end suite: the core loop proven together"
+description = "One end-to-end suite proving score → un-log → song rating → review → listenlist-reacts-to-scoring together, against the deployed production stack."
+verify = "The suite runs against production and passes every Done when check in the epic in one pass."
+after = [7, "1.6"]
+hitl = false
+risk = "low"
