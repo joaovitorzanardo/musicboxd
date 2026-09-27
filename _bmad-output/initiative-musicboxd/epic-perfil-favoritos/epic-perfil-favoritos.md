@@ -51,5 +51,6 @@ Owns the `profiles` schema (display identity, favorites, genre selection ids) bu
 
 ## Notes
 
+- Decision: this epic owns AD-8's "every write verifies the resource belongs to the token's user" for profile edits and favorites — deferred here from epic-contas-acesso, which owns only the auth mechanics (2026-09-27).
 - Waits on epic-catalogo-busca because: the `uploads` presign flow for images is built there first.
 - Waits on epic-ciclo-avaliacao because: the public Profile view (CAP-13) shows a User's Ratings and Reviews, which only exist once that epic ships.

@@ -1,5 +1,7 @@
 ---
-tracker_id: ""
+tracker_id: "MBD-16"
+remote: "https://joaovitorzanardoorg-1788391142221.atlassian.net/browse/MBD-16"
+tracker_status: "backlog"
 key: ""
 type: epic
 title: "Accounts and access"
@@ -50,4 +52,5 @@ Owns the `accounts` Postgres schema and package only. Does not touch `profiles` 
 ## Notes
 
 - Open question (from SPEC): SES sandbox exit timing with SPF/DKIM set — email verification cannot go fully live in production until this clears. Track and surface if it blocks the epic's Done when.
-- Assumption: password minimum length and username charset are unconfirmed (SPEC Assumptions); inception will settle these with the user before the signup story starts.
+- Decision: password minimum 8 characters; username 3-20 chars, alphanumeric plus underscore (user, 2026-09-27) — settles the SPEC's open assumption before entry 1 starts.
+- Decision: this epic owns AD-8's authentication mechanics (tokens, roles, route-level gating) but not AD-8's "every write verifies the resource belongs to the token's user" rule, since `accounts` owns no other module's writable resources. That rule is deferred to each resource-owning epic (epic-ciclo-avaliacao, epic-perfil-favoritos, epic-social-feed), each noted accordingly (set check finding, 2026-09-27).

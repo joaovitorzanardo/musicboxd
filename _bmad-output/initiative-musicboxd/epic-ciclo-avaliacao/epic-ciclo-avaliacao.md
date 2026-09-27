@@ -52,4 +52,5 @@ Owns `ratings`, `reviews`, and `listenlist` schemas — three modules, one epic,
 
 ## Notes
 
+- Decision: this epic owns AD-8's "every write verifies the resource belongs to the token's user" for ratings, reviews, and listenlist items — deferred here from epic-contas-acesso, which owns only the auth mechanics (2026-09-27).
 - Source conflict: SPEC lists Staff removal of Reviews as a non-goal for the MVP, overriding AD-6's admin-delete endpoint; see the initiative's Notes for the full decision. This epic builds only the owner's own edit/delete, no Staff endpoint.

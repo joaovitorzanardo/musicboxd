@@ -51,5 +51,6 @@ Owns the `social` schema (Follow edges) and the `feed` module's Feed query speci
 
 ## Notes
 
+- Decision: this epic owns AD-8's "every write verifies the resource belongs to the token's user" for Follow/unfollow edges — deferred here from epic-contas-acesso, which owns only the auth mechanics (2026-09-27).
 - Waits on epic-ciclo-avaliacao because: the Feed has nothing to show until Ratings and Reviews exist.
 - Waits on epic-perfil-favoritos because: the Follow lists and Feed surface alongside the Profile view that epic assembles; building social first would mean re-touching that page.

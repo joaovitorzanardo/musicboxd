@@ -1,0 +1,121 @@
+# tickets.toml — epic-contas-acesso's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: auth-core (1,2,3,4), authorization (1,5), frontend (1,6), platform-bridge (7), ops (8, independent).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: register, login, and a protected endpoint"
+description = "Adds the accounts schema (Flyway), a registration endpoint (email/password, hashed with BCrypt/Argon2), a login endpoint issuing a ~15-minute JWT access token, and one demo endpoint that requires a valid token."
+verify = "A new person registers, logs in, gets a token, and calls the protected demo endpoint successfully; a wrong password is rejected."
+after = ["1.1"]
+hitl = false
+risk = "high"
+notes = [
+  "High risk check: a person manually verifies a wrong password is rejected and a correct one issues a working token, before merge.",
+  "Decision: password minimum 8 characters; username 3-20 chars, alphanumeric plus underscore (user, 2026-09-27).",
+]
+references = ["ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Email verification gates login"
+description = "Generates a one-time verification token at signup, emails it via Amazon SES, and rejects login for an unverified account until the verify endpoint consumes that token."
+verify = "A freshly registered, unverified account cannot log in; after visiting the verification link, the same credentials log in."
+after = [1]
+hitl = false
+risk = "high"
+notes = ["High risk check: a person confirms an unverified account is truly blocked from login, not just from one code path, before merge."]
+references = ["ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Refresh tokens: opaque, rotated, revocable"
+description = "Issues an opaque refresh token at login, stored hashed in the DB, delivered in an HttpOnly/Secure/SameSite=Lax cookie scoped to the refresh path, rotated on every use with reuse detection and a ~10-second grace window."
+verify = "Refreshing extends the session with a new token and invalidates the old one; replaying an old refresh token after rotation is rejected; two refreshes within the grace window both succeed."
+after = [1]
+hitl = false
+risk = "high"
+notes = ["High risk check: a person exercises concurrent refresh calls and confirms neither a false logout nor a security hole from the grace window."]
+references = ["ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Logout revokes the session's refresh token"
+description = "A logout endpoint revokes the caller's current refresh token so it can no longer be used to obtain new access tokens."
+verify = "After logout, the same refresh token is rejected; a fresh login still works."
+after = [3]
+hitl = false
+risk = "high"
+notes = ["High risk check: a person confirms a revoked refresh token is rejected, not merely expired-looking."]
+
+[[entry]]
+id = 5
+type = "story"
+title = "STAFF role claim and admin route protection"
+description = "Adds a role claim (USER default, STAFF assignable) to the access token and enforces it: every /api/v1/admin/** route requires STAFF, every other write requires an authenticated USER or STAFF, and public GETs need no token."
+verify = "A USER token gets 403 on every /api/v1/admin/** route; a STAFF token succeeds; an unauthenticated caller is rejected on any write and allowed on public reads."
+after = [1]
+hitl = true
+risk = "high"
+notes = [
+  "High risk check: a person confirms 403 on a sample of admin routes, not just one, before merge.",
+  "Assumption: the first STAFF account is bootstrapped by a Flyway seed migration promoting an email read from an environment variable — no self-service staff promotion exists in the MVP. A person sets that variable on first production deploy (hitl).",
+]
+references = ["ARCHITECTURE-SPINE.md#ad-8"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "SPA auth screens and the Guest boundary"
+description = "Adds sign-up, login, and logout screens to the SPA, holds the access token in memory, and redirects any Guest whose write action gets a 401 to sign-up/login instead of failing silently."
+verify = "A logged-out visitor who tries a write action (once one exists) is redirected to sign-up; after logging in, in-memory token state survives navigation but not a hard refresh without a working refresh flow."
+after = [1]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Per-user rate limits on login, registration, and verification email"
+description = "Applies the platform's generic per-user rate limiter (epic-plataforma-base) to the login, registration, and verification-email-sending endpoints."
+verify = "Repeated login attempts, repeated registrations, and repeated verification-email requests from one account are each throttled past their configured limit."
+after = [1, 2, "1.9"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-10"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "SES production access and domain verification"
+description = "Applies for Amazon SES production access (sandbox exit) and sets SPF and DKIM records on the sending domain."
+verify = "SES sends verification email to an arbitrary recipient address, not only pre-verified sandbox addresses."
+after = []
+hitl = true
+risk = "low"
+notes = ["Open question (from the epic): SES sandbox exit timing is outside the team's control; entry 2 works against sandbox-verified addresses until this lands."]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3, 4, 5, 6, 7, 8]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Closing end-to-end suite: accounts and access proven together"
+description = "One end-to-end suite proving sign-up through verification, login, refresh, logout, and the Guest/STAFF boundary together, against the deployed production stack."
+verify = "The suite runs against production and passes every Done when check in the epic in one pass."
+after = [9, "1.6"]
+hitl = false
+risk = "low"
+notes = ["Closing e2e suite offered per ordering rule, consistent with epic-plataforma-base; drop it here if the user prefers not to repeat it."]
