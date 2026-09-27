@@ -1,5 +1,7 @@
 ---
-tracker_id: ""
+tracker_id: "MBD-46"
+remote: "https://joaovitorzanardoorg-1788391142221.atlassian.net/browse/MBD-46"
+tracker_status: "backlog"
 key: ""
 type: epic
 title: "Profile and favorites"

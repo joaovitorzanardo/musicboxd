@@ -1,0 +1,69 @@
+# tickets.toml — epic-perfil-favoritos's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: identity (1), genres (2), favorites (3), public view (4) — converging at the sweep.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: upload avatar/cover, set bio"
+description = "Extends the `profiles` schema stub (from epic-contas-acesso entry 1) with avatar_key, cover_key, and bio columns, and adds endpoints to set them, reusing the uploads presign contract for the images."
+verify = "A User uploads an avatar and a cover image via the presign flow, sets a bio, and all three read back on their own profile; the endpoints take no user id at all — they resolve 'whose profile' only from the caller's token — so User B's token against the same endpoints can only ever read or mutate B's own row."
+after = ["3.4"]
+hitl = false
+risk = "medium"
+notes = ["Ownership note: profiles are 1:1 with the caller's token, so entries in this epic never take a foreign user id — this is the epic's application of the AD-8 rule it owns."]
+references = ["ARCHITECTURE-SPINE.md#ad-9", "ARCHITECTURE-SPINE.md#ad-13"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Favorite genres from the Staff-managed list"
+description = "Adds an endpoint for a User to select their favorite genres, validated against the Staff-managed genre list, storing genre ids only."
+verify = "A User selects genres from the list and they read back on the profile; an id not on the Staff list is rejected."
+after = ["3.3"]
+hitl = false
+risk = "low"
+references = ["ARCHITECTURE-SPINE.md#ad-13"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "5+5 ordered Favorites (Albums and Songs)"
+description = "Adds ordered favorite slots (5 Albums, 5 Songs) referencing catalog ids by id only (no cross-schema foreign key, per AD-12), with no requirement that the item is Rated."
+verify = "A User sets 5 favorite Albums and 5 favorite Songs in a chosen order, including an unrated item and a Song from an Album outside the favorite Albums; the profile shows them in that exact order."
+after = ["3.1", "3.2"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-12", "ARCHITECTURE-SPINE.md#ad-13"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Public Profile view (feed-assembled)"
+description = "Introduces the `feed` module's read-only cross-schema query (AD-3) assembling a Profile: identity and favorites from entries 1-3, plus the User's recent Ratings and Reviews read directly from `ratings`/`reviews`. No token required; any write attempt on the page prompts sign-up instead."
+verify = "A logged-out visitor opens a Profile link and sees picture, cover, bio, genres, Favorites in order, and recent Ratings/Reviews with review text where present, newest first; no login wall blocks the read."
+after = [1, 2, 3, "4.1", "4.4"]
+hitl = false
+risk = "medium"
+notes = ["Introduces the `feed` module and its read-only DB role (SELECT on profiles/ratings/reviews/catalog) — epic-social-feed extends this same module for the Feed itself and follower counts, never recreates it."]
+references = ["ARCHITECTURE-SPINE.md#ad-3"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3, 4]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Closing end-to-end suite: profile and favorites proven together"
+description = "One end-to-end suite proving avatar/cover/bio, favorite genres, ordered favorites, and the public Profile view together, against the deployed production stack."
+verify = "The suite runs against production and passes every Done when check in the epic in one pass."
+after = [5, "1.6"]
+hitl = false
+risk = "low"
