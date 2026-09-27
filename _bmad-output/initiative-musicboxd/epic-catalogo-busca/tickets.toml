@@ -1,0 +1,105 @@
+# tickets.toml — epic-catalogo-busca's stories, in build order.
+# id is stable and never reused; table order is build order.
+# Lanes: catalog-admin (1,2,3), uploads (4,5,6), search (7).
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer bullet: Staff creates an Album behind /admin"
+description = "Adds the catalog schema (Flyway: albums, songs, genres) and a Staff-only endpoint to create an Album, gated by the STAFF role claim from epic-contas-acesso."
+verify = "A STAFF token creates an Album; a USER token gets 403 on the same endpoint."
+after = ["2.5"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-12"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Edit and hide Albums and Songs; assign Songs to an Album"
+description = "Extends catalog admin with editing an Album, creating and editing Songs, assigning Songs to an Album, and hiding/unhiding either — no delete operation exists anywhere."
+verify = "Staff edits an Album, adds a Song to it, and hides the Album; the hidden Album disappears from search but still opens at its direct link; no delete endpoint exists."
+after = [1]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-12"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Staff manages the genre list"
+description = "Adds Staff-only create and edit endpoints for the genre list that epic-perfil-favoritos's favorite-genres feature will read from."
+verify = "Staff adds a genre and edits its name; a USER token gets 403 on both endpoints."
+after = [1]
+hitl = false
+risk = "low"
+references = ["ARCHITECTURE-SPINE.md#ad-13"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "S3 image bucket and the uploads presign contract"
+description = "Creates the S3 image bucket (CORS for the app origin, ACLs disabled, public read on the image prefix only, all other access blocked) and the uploads module: presigned POST issuance, a confirm endpoint, and content-type/size validation, first used for album art."
+verify = "A client requests a presigned POST, uploads a jpeg/png/webp under the size limit directly to S3, confirms it, and the object is readable over HTTPS at the bucket domain; an oversized or wrong-type upload is rejected before it reaches S3."
+after = ["1.4"]
+hitl = true
+risk = "high"
+notes = [
+  "High risk check: a person confirms the bucket policy grants public read ONLY on the image prefix, nothing else, before merge — a misconfigured public bucket is a real data exposure.",
+  "Decision: image bucket name is `musicboxd-images` (single bucket; key prefixes distinguish avatar/, cover/, and album-art/), matching epic-plataforma-base entry 4's IAM role, already scoped to that exact name (set-check finding, 2026-09-27).",
+]
+references = ["ARCHITECTURE-SPINE.md#ad-9"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Album art: attach a confirmed upload to an Album or Song"
+description = "Lets Staff attach a confirmed uploads key as an Album's or Song's cover art, validating the key was issued to that Staff user for that purpose."
+verify = "Staff uploads an image, attaches it to an Album, and the Album page (once one exists) would resolve the image URL; a key not issued to the caller is rejected."
+after = [1, 4]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-9"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Per-user rate limit on upload-URL issuance"
+description = "Applies the platform's generic per-user rate limiter (epic-plataforma-base) to the presign-issuance endpoint."
+verify = "Repeated presign requests from one account are throttled past the configured per-user limit."
+after = [4, "1.9"]
+hitl = false
+risk = "medium"
+references = ["ARCHITECTURE-SPINE.md#ad-10"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Dropdown search: Albums, Songs, and Users"
+description = "Adds Postgres ILIKE + pg_trgm search across non-hidden Albums and Songs, plus Users by username (read from accounts/profiles via its own public API, no cross-schema query), returned in one dropdown with no results page, pagination, or shareable URL."
+verify = "A query returns matching non-hidden Albums, Songs, and Users in one dropdown, each opening its page; a hidden Album or Song is absent from results; there is no results-page route."
+after = [2, "2.1"]
+hitl = false
+risk = "medium"
+notes = ["Depends on epic-contas-acesso entry 1 (2.1), which stands up the `profiles` username stub per the username-ownership decision — not on epic-perfil-favoritos, which only extends that schema later."]
+references = ["ARCHITECTURE-SPINE.md#ad-1", "ARCHITECTURE-SPINE.md#stack"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up scope pushed out of earlier tickets and review findings deferred across the epic."
+verify = "Scope is set when this ticket starts, from the build records and deferred review findings; no functional change results."
+after = [1, 2, 3, 4, 5, 6, 7]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Closing end-to-end suite: catalog and search proven together"
+description = "One end-to-end suite proving Staff catalog management, album art upload, genre management, and dropdown search together, against the deployed production stack."
+verify = "The suite runs against production and passes every Done when check in the epic in one pass."
+after = [8, "1.6"]
+hitl = false
+risk = "low"

@@ -1,5 +1,7 @@
 ---
-tracker_id: ""
+tracker_id: "MBD-27"
+remote: "https://joaovitorzanardoorg-1788391142221.atlassian.net/browse/MBD-27"
+tracker_status: "backlog"
 key: ""
 type: epic
 title: "Catalog and search"

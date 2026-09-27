@@ -39,7 +39,7 @@ Anyone with a Profile link, logged in or not, sees the picture, cover, bio, genr
 
 ## Boundaries
 
-Owns the `profiles` schema (display identity, favorites, genre selection ids) but not the recent-Ratings/Reviews it displays — that's `feed` reading `ratings`/`reviews` read-only (AD-3), built here as part of "public Profile view" since CAP-13 has no other owner. Does not own the genre list itself (Staff-managed in `catalog`, epic-catalogo-busca) or follower/following counts (`social`, epic-social-feed) — those are shown together with this epic's fields on the same page but not written here.
+Owns the `profiles` schema (display identity, favorites, genre selection ids) — including `username`, per AD-13 — but its minimal stub (id, username) is already stood up by epic-contas-acesso's entry 1 at signup; this epic extends that same table with avatar, cover, bio, genres, and favorites, and never recreates it (decision, 2026-09-27). Does not own the recent-Ratings/Reviews it displays — that's `feed` reading `ratings`/`reviews` read-only (AD-3), built here as part of "public Profile view" since CAP-13 has no other owner. Does not own the genre list itself (Staff-managed in `catalog`, epic-catalogo-busca) or follower/following counts (`social`, epic-social-feed) — those are shown together with this epic's fields on the same page but not written here.
 
 - Touch point: `uploads`/S3 — reuses the presign contract epic-catalogo-busca introduced, unchanged, for avatar and cover images.
 

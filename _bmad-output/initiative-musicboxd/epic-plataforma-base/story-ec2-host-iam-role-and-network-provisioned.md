@@ -27,4 +27,4 @@ Verify: The instance is reachable only on 80/443 from the internet; SSM session 
 
 ## Notes
 
-- Open question: This ticket scopes the IAM role to the image bucket by name/ARN before epic-catalogo-busca actually creates that bucket and its policy (AD-9). Reserve the bucket name now and hand it to that epic, or grant the role access to the bucket's future ARN pattern; either way, coordinate with epic-catalogo-busca's first S3 story.
+- Decision: image bucket name is `musicboxd-images` (single bucket; key prefixes distinguish avatar/, cover/, and album-art/). This role's IAM policy is scoped to `arn:aws:s3:::musicboxd-images/*` before epic-catalogo-busca's entry 4 creates the bucket itself — the name is fixed here so both tickets converge on the same literal ARN, not an out-of-band agreement (set-check finding, 2026-09-27).

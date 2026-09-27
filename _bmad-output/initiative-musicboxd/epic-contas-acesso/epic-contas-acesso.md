@@ -39,7 +39,7 @@ A new person can sign up, verify their email, log in, and log out; a Guest can r
 
 ## Boundaries
 
-Owns the `accounts` Postgres schema and package only. Does not touch `profiles` (display identity, avatar/bio — epic-perfil-favoritos) beyond issuing the `USER`/`STAFF` role claim. Password recovery is explicitly deferred (AD-8, SPEC Assumptions) — out of scope here and for the MVP.
+Owns the `accounts` Postgres schema and package. Per AD-13, username belongs to `profiles`, not `accounts` — entry 1 stands up a minimal `profiles` stub (id, username) transactionally at signup, since a username is needed immediately; epic-perfil-favoritos extends that same schema with avatar, cover, bio, genres, and favorites, never recreating it. Beyond that stub and the `USER`/`STAFF` role claim, this epic does not touch `profiles`. Password recovery is explicitly deferred (AD-8, SPEC Assumptions) — out of scope here and for the MVP.
 
 - Touch point: Amazon SES — needs production access (sandbox exit) with SPF/DKIM before verification email can go live in production; this epic owns getting SES ready, but the exit timing is outside the team's control (SPEC Open Questions).
 
@@ -53,4 +53,5 @@ Owns the `accounts` Postgres schema and package only. Does not touch `profiles` 
 
 - Open question (from SPEC): SES sandbox exit timing with SPF/DKIM set — email verification cannot go fully live in production until this clears. Track and surface if it blocks the epic's Done when.
 - Decision: password minimum 8 characters; username 3-20 chars, alphanumeric plus underscore (user, 2026-09-27) — settles the SPEC's open assumption before entry 1 starts.
+- Decision: username ownership stays with `profiles` per AD-13, literal (not `accounts`); entry 1 stands up that schema's minimal stub at signup, ahead of epic-perfil-favoritos. This unblocks epic-catalogo-busca's user search, which depends on entry 1 rather than waiting on epic-perfil-favoritos (user, 2026-09-27).
 - Decision: this epic owns AD-8's authentication mechanics (tokens, roles, route-level gating) but not AD-8's "every write verifies the resource belongs to the token's user" rule, since `accounts` owns no other module's writable resources. That rule is deferred to each resource-owning epic (epic-ciclo-avaliacao, epic-perfil-favoritos, epic-social-feed), each noted accordingly (set check finding, 2026-09-27).

@@ -59,3 +59,4 @@ Tracer path: Staff cadastra um álbum (epic-catalogo-busca) → uma pessoa cria 
 - Open question (from SPEC): SES sandbox exit and SPF/DKIM timing — blocks email verification going live; owned by epic-contas-acesso.
 - Open question (from SPEC): Catalog data source and cover-art licensing are deferred; the catalog stays manual (Staff-entered) for the whole MVP, which epic-catalogo-busca builds for.
 - Decision: estimation stays off for this initiative (default), per user, 2026-09-27.
+- Decision: the S3 image bucket is named `musicboxd-images` (single bucket; key prefixes avatar/, cover/, album-art/) — fixed here so epic-plataforma-base's IAM role (which precedes the bucket's own creation in epic-catalogo-busca) and the bucket's own policy converge on one literal ARN, 2026-09-27.
