@@ -2,6 +2,7 @@ plugins {
 	java
 	id("org.springframework.boot") version "4.1.1"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
 }
 
 group = "com.musicboxd"
@@ -19,6 +20,7 @@ repositories {
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -26,4 +28,8 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+openApi {
+	apiDocsUrl.set("http://localhost:8080/api/v1/api-docs")
 }
