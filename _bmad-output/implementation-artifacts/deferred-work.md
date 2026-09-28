@@ -1,3 +1,6 @@
 - source_plan: `_bmad-output/initiative-musicboxd/epic-plataforma-base/story-tracer-bullet-api-spa-and-local-compose-talk-to-each-other-plan.md`
   summary: Replace the hardcoded local-dev Postgres credentials in deploy/docker-compose.yml with environment-file-based secrets.
   evidence: Real (musicboxd/musicboxd hardcoded in the compose file), but scoped to production secrets handling per AD-11 ("secrets live in environment files on the host, outside the repo"), which is entry 1.5's ("Production Compose stack behind nginx TLS") job, not this tracer-bullet ticket's.
+- source_plan: none (native /plan for MBD-6, not a bmad-build plan file)
+  summary: Wire OpenAPI client generation into web/Dockerfile and deploy/docker-compose.yml so Docker builds regenerate web/src/api-client/ from api's build output automatically.
+  evidence: Deliberately out of scope for MBD-6 (user's choice): Docker's build context isolation means api/build/openapi.json isn't available to web's image build unless api/ is built first and the artifact is explicitly copied across -- that coordination belongs with entry 1.3 (CI/CD). Local dev (./gradlew generateOpenApiDocs or ./gradlew build, then npm run build) works today.
