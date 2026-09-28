@@ -1,1 +1,11 @@
 _bmad/render/
+
+# api (Gradle)
+api/.gradle/
+api/build/
+!api/gradle/wrapper/gradle-wrapper.jar
+
+# web (Vite/npm)
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
