@@ -2,7 +2,7 @@
 title: Musicboxd
 status: final
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 # PRD: Musicboxd
@@ -46,11 +46,11 @@ Casual listeners who don't care about logging. Artists needing special tools: th
 
 - **User** — a person with an account. Can be followed and can follow other Users.
 - **Guest** — a visitor without an account. Read-only.
-- **Staff** — a privileged User role that manages the Catalog and can remove content.
+- **Staff** — a privileged User role that manages the Catalog (create, edit, hide; no deletion) and the genre list, and can remove Users' Reviews.
 - **Catalog** — the set of Albums and Songs available to log. Filled manually by Staff.
 - **Album** — a release in the Catalog; contains one or more Songs.
 - **Song** — a track belonging to an Album.
-- **Log** — a User's record of having listened to an Album.
+- **Log** — a User's record of having listened to an Album. It is not a separate record: an Album is Logged for a User exactly when that User has given it an Album Score. Rating Songs alone does not Log the Album.
 - **Rating** — a score from 0 to 5 in half-star steps, given to an Album or a Song.
 - **Album Score** — the Rating a User gives an Album directly. Independent of that User's Song Ratings.
 - **Review** — free-text opinion written by a User on an Album.
@@ -84,7 +84,10 @@ A person can create an account, log in, and log out. `[ASSUMPTION: authenticatio
 
 #### FR-3: Staff catalog management
 
-Staff can create and edit Albums and Songs, and assign Songs to Albums.
+Staff can create and edit Albums and Songs, and assign Songs to Albums. Staff can also hide an Album or Song, removing it from search while it stays reachable by its link.
+
+- Albums and Songs are never deleted in the MVP, so existing Ratings, Reviews, Listenlists, and Favorites stay valid.
+- Staff also manages the list of genres Users can choose from (FR-12).
 
 - A non-Staff User cannot access catalog management.
 
@@ -94,13 +97,14 @@ A User or Guest can search the Catalog for Albums and Songs and open their pages
 
 ### 4.3 Logging and Rating
 
-**Description:** The core loop. A User Logs an Album and Rates it in one of two modes: rate just the Album, or rate each Song. Realizes UJ-1, UJ-2. A User can Rate an Album, its Songs individually, or both. An Album is Logged only once per User; the User can change its Rating afterwards.
+**Description:** The core loop. A User Logs an Album by Rating it, and can also Rate its Songs individually. Realizes UJ-1, UJ-2. A User can Rate an Album, its Songs individually, or both; only the Album Score Logs the Album. An Album is Logged only once per User; the User can change its Rating afterwards or delete it.
 
 #### FR-5: Log and rate an Album
 
-A User can Log an Album and give it a Rating from 0 to 5 in half-star steps.
+A User can Log an Album by giving it a Rating from 0 to 5 in half-star steps. Giving the Album Score is what Logs it; an Album cannot be Logged without a Rating.
 
 - Values outside 0–5 or not on a 0.5 step are rejected.
+- A User can delete their own Album Score, which un-Logs the Album.
 
 #### FR-6: Rate individual Songs
 
@@ -122,7 +126,8 @@ A User can write a Review on an Album.
 
 A User can add an Album to their Listenlist and remove it.
 
-- Logging an Album that is on the Listenlist removes it from the Listenlist.
+- Logging an Album (giving it an Album Score) that is on the Listenlist removes it from the Listenlist.
+- An Album the User has already Logged cannot be added to their Listenlist.
 - A Listenlist is visible to other Users and Guests.
 
 ### 4.5 Social
@@ -149,12 +154,13 @@ A User can set a profile picture, cover picture, and bio.
 
 #### FR-12: Favorite genres
 
-A User can choose their own favorite genres. These are later used for recommendations.
+A User can choose their own favorite genres from a list managed by Staff. These are later used for recommendations.
 
 #### FR-13: Favorites
 
-A User can choose 5 favorite Albums and 5 favorite Songs, shown on their Profile.
+A User can choose 5 favorite Albums and 5 favorite Songs, shown on their Profile in the order the User sets.
 
+- A User does not need to have Rated an Album or Song to make it a favorite.
 - Favorite Songs may come from Albums not among the favorite Albums.
 
 #### FR-14: Public Profile view
