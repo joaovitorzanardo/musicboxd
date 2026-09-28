@@ -1,0 +1,57 @@
+services:
+  api:
+    build:
+      context: ../api
+    restart: on-failure
+    networks:
+      - internal
+    # No ports published: reached only through nginx's proxy (AD-11).
+    healthcheck:
+      # No wget/curl in eclipse-temurin's minimal Ubuntu runtime image; bash's
+      # /dev/tcp is used instead to check the port is accepting connections.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/8080']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    image: postgres:18
+    restart: on-failure
+    # Local-dev-only credentials, intentionally hardcoded here. Production
+    # secrets (env-file-based, per AD-11) are entry 1.5's job, not this
+    # ticket's -- see deferred-work.md and this plan's Review Triage Log.
+    environment:
+      POSTGRES_DB: musicboxd
+      POSTGRES_USER: musicboxd
+      POSTGRES_PASSWORD: musicboxd
+    volumes:
+      # Postgres 18+ images key data dirs by major version under a single
+      # mount at /var/lib/postgresql (not .../data) -- see
+      # https://github.com/docker-library/postgres/pull/1259.
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - internal
+    # No ports published: Postgres is reachable only on the internal
+    # Docker network (AD-11) -- nothing reads/writes it in this ticket.
+
+  nginx:
+    build:
+      # Root context so the Dockerfile can COPY both web/ and
+      # deploy/nginx/nginx.conf (see web/Dockerfile).
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: on-failure
+    ports:
+      - '80:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:
