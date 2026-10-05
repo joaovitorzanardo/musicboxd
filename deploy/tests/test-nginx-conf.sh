@@ -9,14 +9,27 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 mkdir -p "$TMP/live/$DOMAIN"
+PRIVKEY="$TMP/live/$DOMAIN/privkey.pem"
+FULLCHAIN="$TMP/live/$DOMAIN/fullchain.pem"
+# Convert to Windows paths for openssl if on Windows
+PRIVKEY_WIN=$(cygpath -w "$PRIVKEY" 2>/dev/null || echo "$PRIVKEY")
+FULLCHAIN_WIN=$(cygpath -w "$FULLCHAIN" 2>/dev/null || echo "$FULLCHAIN")
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$DOMAIN" \
-  -keyout "$TMP/live/$DOMAIN/privkey.pem" -out "$TMP/live/$DOMAIN/fullchain.pem" 2>/dev/null
+  -keyout "$PRIVKEY_WIN" -out "$FULLCHAIN_WIN" 2>/dev/null || {
+  # Try alternative: escape the subject format
+  openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "//CN=$DOMAIN" \
+    -keyout "$PRIVKEY_WIN" -out "$FULLCHAIN_WIN" 2>/dev/null || true
+}
+
+# Convert paths to Windows format for docker on MSYS2; no-op on Linux/macOS
+HOST_PWD=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")
+HOST_TMP=$(cygpath -m "$TMP" 2>/dev/null || echo "$TMP")
 
 # --add-host: nginx -t resolves the `api` upstream at load time.
-docker run --rm --add-host api:127.0.0.1 \
+MSYS_NO_PATHCONV=1 docker run --rm --add-host api:127.0.0.1 \
   -e DOMAIN="$DOMAIN" -e NGINX_ENVSUBST_FILTER=DOMAIN \
-  -v "$PWD/deploy/nginx/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro" \
-  -v "$TMP:/etc/letsencrypt:ro" \
+  -v "$HOST_PWD/deploy/nginx/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+  -v "$HOST_TMP:/etc/letsencrypt:ro" \
   nginx:1.27-alpine sh -c '/docker-entrypoint.d/20-envsubst-on-templates.sh >/dev/null && nginx -t && nginx -T 2>/dev/null' > "$TMP/out.txt"
 
 grep -q 'listen 443 ssl' "$TMP/out.txt"
