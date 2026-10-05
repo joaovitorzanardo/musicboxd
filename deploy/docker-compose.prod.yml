@@ -1,0 +1,58 @@
+# Run on the EC2 host from /opt/musicboxd with:
+#   docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER}/musicboxd-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
+    networks: [internal]
+    # No ports published: reached only through nginx (AD-11).
+    healthcheck:
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/8080']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    env_file: ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [internal]
+    # No ports published (AD-11).
+
+  nginx:
+    image: ghcr.io/${GHCR_OWNER}/musicboxd-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN}
+      NGINX_ENVSUBST_FILTER: DOMAIN
+    volumes:
+      - ./nginx/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+  # Never started by `up`; used via `docker compose run --rm certbot ...`.
+  certbot:
+    image: certbot/certbot:latest
+    profiles: [tools]
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:
+  letsencrypt:
+  certbot_www:
