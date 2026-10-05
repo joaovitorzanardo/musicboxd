@@ -11,15 +11,12 @@ trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/live/$DOMAIN"
 PRIVKEY="$TMP/live/$DOMAIN/privkey.pem"
 FULLCHAIN="$TMP/live/$DOMAIN/fullchain.pem"
-# Convert to Windows paths for openssl if on Windows
-PRIVKEY_WIN=$(cygpath -w "$PRIVKEY" 2>/dev/null || echo "$PRIVKEY")
-FULLCHAIN_WIN=$(cygpath -w "$FULLCHAIN" 2>/dev/null || echo "$FULLCHAIN")
-openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$DOMAIN" \
-  -keyout "$PRIVKEY_WIN" -out "$FULLCHAIN_WIN" 2>/dev/null || {
-  # Try alternative: escape the subject format
-  openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "//CN=$DOMAIN" \
-    -keyout "$PRIVKEY_WIN" -out "$FULLCHAIN_WIN" 2>/dev/null || true
-}
+# openssl on MSYS2/Git Bash needs Windows paths; no-op on Linux/macOS
+PRIVKEY_OSSL=$(cygpath -w "$PRIVKEY" 2>/dev/null || echo "$PRIVKEY")
+FULLCHAIN_OSSL=$(cygpath -w "$FULLCHAIN" 2>/dev/null || echo "$FULLCHAIN")
+# Git Bash rewrites a leading "/CN=" into a path; MSYS2_ARG_CONV_EXCL stops that. Real openssl errors stay visible and fatal.
+MSYS2_ARG_CONV_EXCL='/CN=' openssl req -quiet -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$DOMAIN" \
+  -keyout "$PRIVKEY_OSSL" -out "$FULLCHAIN_OSSL"
 
 # Convert paths to Windows format for docker on MSYS2; no-op on Linux/macOS
 HOST_PWD=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")

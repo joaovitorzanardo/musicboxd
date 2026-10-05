@@ -1,9 +1,19 @@
-# Run on the EC2 host from /opt/musicboxd with:
+# Production stack. Run on the EC2 host from /opt/musicboxd with:
 #   docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d
+# `name:` pins the project (and so the volume names) regardless of the directory compose runs from.
+name: musicboxd
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   api:
-    image: ghcr.io/${GHCR_OWNER}/musicboxd-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set in /etc/musicboxd/stack.env}/musicboxd-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    logging: *default-logging
     env_file: ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
     networks: [internal]
     # No ports published: reached only through nginx (AD-11).
@@ -17,6 +27,7 @@ services:
   postgres:
     image: postgres:18
     restart: unless-stopped
+    logging: *default-logging
     env_file: ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
     volumes:
       - postgres_data:/var/lib/postgresql
@@ -24,13 +35,14 @@ services:
     # No ports published (AD-11).
 
   nginx:
-    image: ghcr.io/${GHCR_OWNER}/musicboxd-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set in /etc/musicboxd/stack.env}/musicboxd-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - '80:80'
       - '443:443'
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: ${DOMAIN:?DOMAIN must be set in /etc/musicboxd/stack.env}
       NGINX_ENVSUBST_FILTER: DOMAIN
     volumes:
       - ./nginx/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro

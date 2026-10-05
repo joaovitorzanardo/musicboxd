@@ -15,4 +15,10 @@ grep -q 'ghcr.io/someone/musicboxd-web:latest' <<<"$OUT"
 PUBLISHED=$(grep -E '^\s+published:' <<<"$OUT" | tr -d ' "' | sort | tr '\n' ' ')
 [ "$PUBLISHED" = "published:443 published:80 " ] || { echo "unexpected published ports: $PUBLISHED"; exit 1; }
 ! grep -q 'POSTGRES_PASSWORD: musicboxd' <<<"$OUT"   # no hardcoded dev creds
+# Missing GHCR_OWNER / DOMAIN must fail fast with a clear message (not render empty values).
+if ERR=$(MUSICBOXD_ENV_DIR="$TMP" env -u GHCR_OWNER -u DOMAIN docker compose -f docker-compose.prod.yml config 2>&1 >/dev/null); then
+  echo "compose config succeeded without GHCR_OWNER/DOMAIN"; exit 1
+fi
+grep -q 'must be set' <<<"$ERR" || { echo "missing-var error lacks 'must be set': $ERR"; exit 1; }
+echo "missing-variable check OK"
 echo "prod compose config OK"
