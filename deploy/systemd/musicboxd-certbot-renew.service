@@ -1,0 +1,10 @@
+# deploy/systemd/musicboxd-certbot-renew.service
+[Unit]
+Description=Renew musicboxd TLS certificate and reload nginx
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/musicboxd
+ExecStart=/opt/musicboxd/certbot/renew-cert.sh

@@ -1,0 +1,11 @@
+# deploy/systemd/musicboxd-certbot-renew.timer
+[Unit]
+Description=Twice-daily musicboxd certificate renewal check
+
+[Timer]
+OnCalendar=*-*-* 03,15:17:00
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
