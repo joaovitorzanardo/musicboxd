@@ -16,8 +16,13 @@ cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "docker $*" >> "$STUB_TMP/docker.log"
 case " $* " in
+  *" up "*)
+    cur=$(sed -n 's/^IMAGE_TAG=//p' "$STUB_TMP/stack.env" | tail -1)
+    if [ -f "$STUB_TMP/fail_up_tag" ] && [ "$cur" = "$(cat "$STUB_TMP/fail_up_tag")" ]; then exit 1; fi ;;
   *" ps "*)
-    echo "api running $(cat "$STUB_TMP/health")"
+    cur=$(sed -n 's/^IMAGE_TAG=//p' "$STUB_TMP/stack.env" | tail -1)
+    if [ -f "$STUB_TMP/bad_tag" ] && [ "$cur" = "$(cat "$STUB_TMP/bad_tag")" ]; then h=unhealthy; else h=$(cat "$STUB_TMP/health"); fi
+    echo "api running $h"
     echo "web $(cat "$STUB_TMP/web_state") "
     echo "db running healthy" ;;
 esac
@@ -66,6 +71,25 @@ grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
 echo running > "$TMP/web_state"
 echo "case 2b (service not running -> rollback) OK"
 
+# 2c rollback succeeds: only the new tag is unhealthy
+echo healthy > "$TMP/health"; echo "$TAG_B" > "$TMP/bad_tag"; : > "$TMP/docker.log"
+set +e; run_deploy "$TAG_B" 2> "$TMP/err"; rc=$?; set -e
+[ "$rc" = 1 ]
+grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
+[ "$(grep -c 'compose.* up -d' "$TMP/docker.log")" = 2 ]
+! grep -q 'Rollback to .* also failed' "$TMP/err"
+rm -f "$TMP/bad_tag"
+echo "case 2c (rollback healthy) OK"
+
+# 2d up -d itself fails for the new tag -> exit 1, tag restored
+echo "$TAG_B" > "$TMP/fail_up_tag"; : > "$TMP/docker.log"
+set +e; run_deploy "$TAG_B" 2> "$TMP/err"; rc=$?; set -e
+[ "$rc" = 1 ]
+grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
+! grep -q 'Rollback to .* also failed' "$TMP/err"
+rm -f "$TMP/fail_up_tag"
+echo "case 2d (up -d fails -> rollback) OK"
+
 # 3 bad tags exit 2 and leave stack.env untouched
 : > "$TMP/docker.log"
 for bad in "" latest 'sha-x; rm -rf /' "sha-${TAG#sha-}0"; do
@@ -76,6 +100,20 @@ set +e; run_deploy 2>/dev/null; rc=$?; set -e; [ "$rc" = 2 ]
 grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
 [ ! -s "$TMP/docker.log" ]
 echo "case 3 (bad tags) OK"
+
+# 5 stack.env without IMAGE_TAG: tag gets appended; failure has nothing to roll back to
+cp "$TMP/stack.env" "$TMP/stack.env.keep"
+printf 'DOMAIN=example.test
+' > "$TMP/stack.env"
+run_deploy "$TAG"
+grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
+printf 'DOMAIN=example.test
+' > "$TMP/stack.env"; echo "$TAG_B" > "$TMP/bad_tag"; : > "$TMP/docker.log"
+set +e; run_deploy "$TAG_B" 2>/dev/null; rc=$?; set -e
+[ "$rc" = 1 ]
+[ "$(grep -c 'compose.* up -d' "$TMP/docker.log")" = 1 ]
+rm -f "$TMP/bad_tag"; cp "$TMP/stack.env.keep" "$TMP/stack.env"
+echo "case 5 (no IMAGE_TAG in env file) OK"
 
 # 4 lock held -> deploy waits for it
 if [ "$HAVE_FLOCK" = 1 ]; then

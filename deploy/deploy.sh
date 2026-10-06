@@ -18,7 +18,16 @@ exec 9>"$LOCK_FILE"; flock 9          # serialize concurrent deploys; later one 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$STACK_DIR/docker-compose.prod.yml")
 PREV=$(sed -n 's/^IMAGE_TAG=//p' "$ENV_FILE" | tail -1)
 
-set_tag() { sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$1/" "$ENV_FILE"; }
+set_tag() {  # sed alone is a silent no-op when the line is missing, so append and verify
+  if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then
+    sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$1/" "$ENV_FILE"
+  else
+    printf '
+IMAGE_TAG=%s
+' "$1" >> "$ENV_FILE"
+  fi
+  grep -q "^IMAGE_TAG=$1\$" "$ENV_FILE"
+}
 
 # Healthy = at least one service listed, every service running, and api reports healthy.
 wait_healthy() {
@@ -39,7 +48,9 @@ apply() {  # $1 = tag
 
 git -C "$SRC_DIR" fetch --quiet origin
 git -C "$SRC_DIR" checkout --quiet --detach "$GIT_REF"
-cp -r "$SRC_DIR/deploy/." "$STACK_DIR/"      # compose + nginx template ship with the repo
+# --remove-destination unlinks first, so this running script (possibly launched from STACK_DIR)
+# keeps its old inode instead of being overwritten mid-read.
+cp -r --remove-destination "$SRC_DIR/deploy/." "$STACK_DIR/"      # compose + nginx template ship with the repo
 
 if apply "$TAG"; then
   echo "Deployed $TAG"
