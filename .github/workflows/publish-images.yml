@@ -1,16 +1,13 @@
 name: Publish images
 
 # Builds the api and web (nginx + SPA) images for linux/arm64 (t4g.small EC2,
-# AD-11) on native arm64 runners and pushes them to GHCR on every push to main.
+# AD-11) on native arm64 runners and pushes them to GHCR on every push to main,
+# then deploys the pushed sha tag to the EC2 host over SSM.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
-concurrency:
-  group: publish-images-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,6 +16,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04-arm
+    # Cancel superseded builds only; a workflow-level group would also cancel an in-flight deploy.
+    concurrency:
+      group: publish-${{ github.ref }}-${{ matrix.name }}
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
@@ -59,3 +60,72 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    # Serialize deploys; never cancel one mid-flight (would leave the host half-updated).
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy on EC2 via SSM
+        env:
+          INSTANCE_ID: ${{ vars.DEPLOY_INSTANCE_ID }}
+          TAG: sha-${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # --timeout-seconds is the SSM delivery timeout; executionTimeout is the run limit.
+          JQ_ARGS=(-nc --arg cmd "cd /opt/musicboxd && ./deploy.sh $TAG"
+            '{commands: [$cmd], executionTimeout: ["900"]}')
+          PARAMS=$(jq "${JQ_ARGS[@]}")
+          SEND=(aws ssm send-command
+            --instance-ids "$INSTANCE_ID"
+            --document-name AWS-RunShellScript
+            --timeout-seconds 600
+            --parameters "$PARAMS"
+            --query Command.CommandId
+            --output text)
+          CMD_ID=$("${SEND[@]}")
+
+          invocation() {
+            aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" "$@"
+          }
+
+          # Poll bound (180 x 5s = 900s) equals executionTimeout above. `aws ssm wait` gives up
+          # after ~100s. Right after send-command the invocation may not exist yet: only that
+          # error is retried, anything else (AccessDenied, bad instance id) fails immediately.
+          ERR_FILE=$(mktemp)
+          STATUS=Pending
+          for _ in $(seq 1 180); do
+            if STATUS=$(invocation --query Status --output text 2>"$ERR_FILE"); then
+              case "$STATUS" in
+                Pending | InProgress | Delayed) ;;
+                *) break ;;
+              esac
+            elif grep -q InvocationDoesNotExist "$ERR_FILE"; then
+              STATUS=Pending
+            else
+              cat "$ERR_FILE"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Final status: $STATUS"
+          echo "----- remote stdout -----"
+          invocation --query StandardOutputContent --output text || true
+          echo "----- remote stderr -----"
+          invocation --query StandardErrorContent --output text || true
+
+          [ "$STATUS" = Success ]
