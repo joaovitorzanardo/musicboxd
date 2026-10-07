@@ -22,9 +22,7 @@ set_tag() {  # sed alone is a silent no-op when the line is missing, so append a
   if grep -q '^IMAGE_TAG=' "$ENV_FILE"; then
     sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$1/" "$ENV_FILE"
   else
-    printf '
-IMAGE_TAG=%s
-' "$1" >> "$ENV_FILE"
+    printf '\nIMAGE_TAG=%s\n' "$1" >> "$ENV_FILE"
   fi
   grep -q "^IMAGE_TAG=$1\$" "$ENV_FILE"
 }

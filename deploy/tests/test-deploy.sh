@@ -103,12 +103,10 @@ echo "case 3 (bad tags) OK"
 
 # 5 stack.env without IMAGE_TAG: tag gets appended; failure has nothing to roll back to
 cp "$TMP/stack.env" "$TMP/stack.env.keep"
-printf 'DOMAIN=example.test
-' > "$TMP/stack.env"
+printf 'DOMAIN=example.test\n' > "$TMP/stack.env"
 run_deploy "$TAG"
 grep -q "^IMAGE_TAG=$TAG$" "$TMP/stack.env"
-printf 'DOMAIN=example.test
-' > "$TMP/stack.env"; echo "$TAG_B" > "$TMP/bad_tag"; : > "$TMP/docker.log"
+printf 'DOMAIN=example.test\n' > "$TMP/stack.env"; echo "$TAG_B" > "$TMP/bad_tag"; : > "$TMP/docker.log"
 set +e; run_deploy "$TAG_B" 2>/dev/null; rc=$?; set -e
 [ "$rc" = 1 ]
 [ "$(grep -c 'compose.* up -d' "$TMP/docker.log")" = 1 ]
