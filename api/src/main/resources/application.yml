@@ -1,5 +1,7 @@
 server:
   port: 8080
+  # Trust the client IP nginx forwards; nginx overwrites X-Forwarded-For (deploy/nginx).
+  forward-headers-strategy: native
 
 spring:
   application:
@@ -10,3 +12,11 @@ springdoc:
     path: /api/v1/api-docs
   swagger-ui:
     enabled: false
+
+# AD-10 layer 2: named per-user limit policies, applied with @RateLimited(policy = "...").
+musicboxd:
+  rate-limit:
+    policies:
+      demo:
+        capacity: 5
+        refill-period: 1m

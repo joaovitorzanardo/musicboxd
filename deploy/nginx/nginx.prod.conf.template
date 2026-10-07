@@ -2,6 +2,10 @@
 # Rendered by the nginx image entrypoint (envsubst, DOMAIN only) into
 # /etc/nginx/conf.d/default.conf, replacing the HTTP-only config baked in by web/Dockerfile.
 
+# AD-10 layer 1: per-IP request throttle for every route. ~10 r/s sustained with a burst
+# of 30 so one SPA page load (index + chunks) passes. 429, not nginx's default 503.
+limit_req_zone $binary_remote_addr zone=perip:10m rate=10r/s;
+
 server {
     listen 80;
     server_name ${DOMAIN};
@@ -25,6 +29,12 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
+    limit_req zone=perip burst=30 nodelay;
+    limit_req_status 429;
+
+    # Generic request body cap (AD-10). Upload-specific limits belong to the epics that own uploads.
+    client_max_body_size 1m;
+
     root /usr/share/nginx/html;
     index index.html;
 
@@ -38,7 +48,9 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Overwrite, never append: a client-supplied X-Forwarded-For must not reach the api,
+        # or the per-user/IP limiter can be dodged by forging it.
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
