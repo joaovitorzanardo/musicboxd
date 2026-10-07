@@ -84,28 +84,48 @@ jobs:
           TAG: sha-${{ github.sha }}
         run: |
           set -euo pipefail
-          PARAMS=$(jq -nc --arg cmd "cd /opt/musicboxd && ./deploy.sh $TAG"             '{commands: [$cmd], executionTimeout: ["900"]}')
-          CMD_ID=$(aws ssm send-command             --instance-ids "$INSTANCE_ID"             --document-name AWS-RunShellScript             --timeout-seconds 600             --parameters "$PARAMS"             --query Command.CommandId --output text)
 
-          # `aws ssm wait` gives up after ~100s; poll for up to 600s instead.
-          # The invocation may not exist yet right after send-command, so errors just retry.
+          # --timeout-seconds is the SSM delivery timeout; executionTimeout is the run limit.
+          JQ_ARGS=(-nc --arg cmd "cd /opt/musicboxd && ./deploy.sh $TAG"
+            '{commands: [$cmd], executionTimeout: ["900"]}')
+          PARAMS=$(jq "${JQ_ARGS[@]}")
+          SEND=(aws ssm send-command
+            --instance-ids "$INSTANCE_ID"
+            --document-name AWS-RunShellScript
+            --timeout-seconds 600
+            --parameters "$PARAMS"
+            --query Command.CommandId
+            --output text)
+          CMD_ID=$("${SEND[@]}")
+
+          invocation() {
+            aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" "$@"
+          }
+
+          # Poll bound (180 x 5s = 900s) equals executionTimeout above. `aws ssm wait` gives up
+          # after ~100s. Right after send-command the invocation may not exist yet: only that
+          # error is retried, anything else (AccessDenied, bad instance id) fails immediately.
+          ERR_FILE=$(mktemp)
           STATUS=Pending
-          for _ in $(seq 1 120); do
-            if STATUS=$(aws ssm get-command-invocation                 --command-id "$CMD_ID" --instance-id "$INSTANCE_ID"                 --query Status --output text); then
+          for _ in $(seq 1 180); do
+            if STATUS=$(invocation --query Status --output text 2>"$ERR_FILE"); then
               case "$STATUS" in
                 Pending | InProgress | Delayed) ;;
                 *) break ;;
               esac
-            else
+            elif grep -q InvocationDoesNotExist "$ERR_FILE"; then
               STATUS=Pending
+            else
+              cat "$ERR_FILE"
+              exit 1
             fi
             sleep 5
           done
 
           echo "Final status: $STATUS"
           echo "----- remote stdout -----"
-          aws ssm get-command-invocation             --command-id "$CMD_ID" --instance-id "$INSTANCE_ID"             --query StandardOutputContent --output text || true
+          invocation --query StandardOutputContent --output text || true
           echo "----- remote stderr -----"
-          aws ssm get-command-invocation             --command-id "$CMD_ID" --instance-id "$INSTANCE_ID"             --query StandardErrorContent --output text || true
+          invocation --query StandardErrorContent --output text || true
 
           [ "$STATUS" = Success ]
