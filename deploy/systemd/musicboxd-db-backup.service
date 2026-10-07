@@ -1,0 +1,10 @@
+# deploy/systemd/musicboxd-db-backup.service
+[Unit]
+Description=Back up the musicboxd Postgres database to S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/musicboxd
+ExecStart=/opt/musicboxd/backup/backup-db.sh
