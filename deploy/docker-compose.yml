@@ -18,9 +18,9 @@ services:
   postgres:
     image: postgres:18
     restart: on-failure
-    # Local-dev-only credentials, intentionally hardcoded: this file never runs on the
-    # host and publishes no Postgres port. Production reads them from
-    # /etc/musicboxd/postgres.env (docker-compose.prod.yml, AD-11).
+    # Local-dev-only credentials, intentionally hardcoded; no Postgres port is published.
+    # deploy.sh copies this file to the host with the rest of deploy/, but every host
+    # script uses docker-compose.prod.yml, which reads /etc/musicboxd/postgres.env (AD-11).
     environment:
       POSTGRES_DB: musicboxd
       POSTGRES_USER: musicboxd
