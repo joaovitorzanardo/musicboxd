@@ -11,3 +11,9 @@ web/dist/
 web/*.tsbuildinfo
 web/src/api-client/
 web/tools/openapi-ts-gen/node_modules/
+
+# Editor (VS Code Java) build output
+api/bin/
+
+# Local-only notes with real infrastructure values
+*.local.md
