@@ -1,0 +1,18 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-postgres-dumps",
+      "Filter": { "Prefix": "postgres/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 30 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 7 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "remove-expired-delete-markers",
+      "Filter": { "Prefix": "postgres/" },
+      "Status": "Enabled",
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
+    }
+  ]
+}

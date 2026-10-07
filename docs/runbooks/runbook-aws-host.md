@@ -21,7 +21,7 @@ here before the ticket is closed (AC 5).
 | Security group                    | `musicboxd-host` (`TODO sg-...`)                                                   |
 | IAM role / instance profile       | `musicboxd-host-role` (`TODO` ARN)                                                 |
 | Images bucket (not created here)  | `musicboxd-images` (MBD-31)                                                        |
-| Backups bucket (not created here) | `musicboxd-backups` (fallback if name is taken: `TODO musicboxd-backups-<suffix>`) |
+| Backups bucket (MBD-11)           | `musicboxd-backups` (fallback if name is taken: `TODO musicboxd-backups-<suffix>`); setup in `runbook-mbd-11-postgres-backups.md` |
 
 ## 0. Prerequisite: default VPC
 
@@ -354,7 +354,7 @@ resolves), then `sudo docker compose --env-file /etc/musicboxd/stack.env -f dock
   then `sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml pull && sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d`.
 - **Lost or empty `letsencrypt` volume:** nginx will crash-loop with no certificate. Run `sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml stop nginx`, then
   `sudo ./certbot/init-cert.sh`, then `sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d`.
-- **Not in this ticket:** certificate expiry alarm (AD-11, deferred), real-domain swap, Postgres backups (MBD-11),
+- **Not in this ticket:** certificate expiry alarm (AD-11, deferred), real-domain swap, Postgres backups (MBD-11, see runbook-mbd-11-postgres-backups.md),
   CD (MBD-10), rate limiting (MBD-13).
 
 ## Cost (AD-10, approximate, verify against AWS pricing)

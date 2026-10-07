@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# deploy/tests/fake-aws - stands in for the AWS CLI in tests. Supports `s3 cp` (either direction) and
+# `s3 ls s3://bucket/prefix/`, backed by the directory $FAKE_S3. Touch $FAKE_S3/.fail_cp to make cp fail
+# the way the real CLI can (exit 255).
+set -euo pipefail
+args=()
+while (($#)); do
+  case $1 in
+    --region) shift 2 ;;
+    --only-show-errors) shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+set -- "${args[@]}"
+local_path() { echo "$FAKE_S3/${1#s3://}"; }
+
+case "$1 $2" in
+  "s3 cp")
+    [ -f "$FAKE_S3/.fail_cp" ] && { echo "upload failed: simulated" >&2; exit 255; }
+    src=$3; dst=$4
+    [[ $src == s3://* ]] && src=$(local_path "$src")
+    if [[ $dst == s3://* ]]; then dst=$(local_path "$dst"); mkdir -p "$(dirname "$dst")"; fi
+    cp "$src" "$dst" ;;
+  "s3 ls")
+    dir=$(local_path "$3")
+    { [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ]; } || exit 1     # real CLI exits 1 on an empty prefix
+    for f in "$dir"/*; do printf '2026-10-07 04:30:00 %10d %s\n' "$(wc -c < "$f")" "$(basename "$f")"; done ;;
+  *) echo "fake-aws: unsupported: $*" >&2; exit 64 ;;
+esac
