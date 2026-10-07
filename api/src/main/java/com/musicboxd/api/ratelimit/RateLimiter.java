@@ -3,21 +3,21 @@ package com.musicboxd.api.ratelimit;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * In-memory token bucket per (policy, key). Single-host by design (AD-11): no shared
- * store, so state resets on restart. Bounded: when {@code maxTrackedKeys} buckets exist,
- * idle ones (untouched for a full refill period, hence full again) are swept; if it is
- * still full of live keys, new keys are rejected rather than admitted unlimited.
+ * store, so state resets on restart. Memory is bounded per policy: when a policy holds
+ * {@code maxTrackedKeys} buckets, idle ones (untouched for a full refill period, hence full
+ * again) are swept, and if none are idle the least recently used bucket is evicted. A key
+ * flood therefore costs at most one extra request for an evicted caller; it never locks
+ * out new callers, and never touches another policy's buckets.
  */
 public class RateLimiter {
 
 	public record Decision(boolean allowed, Duration retryAfter) {
-	}
-
-	private record BucketId(String policy, String key) {
 	}
 
 	private static final class Bucket {
@@ -32,12 +32,13 @@ public class RateLimiter {
 	}
 
 	private final Map<String, RateLimitPolicy> policies;
+	private final Map<String, ConcurrentHashMap<String, Bucket>> bucketsByPolicy = new HashMap<>();
 	private final Clock clock;
 	private final int maxTrackedKeys;
-	private final ConcurrentHashMap<BucketId, Bucket> buckets = new ConcurrentHashMap<>();
 
 	public RateLimiter(Map<String, RateLimitPolicy> policies, Clock clock, int maxTrackedKeys) {
 		this.policies = Map.copyOf(policies);
+		this.policies.keySet().forEach(name -> bucketsByPolicy.put(name, new ConcurrentHashMap<>()));
 		this.clock = clock;
 		this.maxTrackedKeys = maxTrackedKeys;
 	}
@@ -50,16 +51,13 @@ public class RateLimiter {
 
 		long now = nanosNow();
 		long periodNanos = policy.refillPeriod().toNanos();
-		BucketId id = new BucketId(policyName, key);
+		ConcurrentHashMap<String, Bucket> buckets = bucketsByPolicy.get(policyName);
 
-		if (!buckets.containsKey(id) && buckets.size() >= maxTrackedKeys) {
-			sweep(now);
-			if (buckets.size() >= maxTrackedKeys) {
-				return new Decision(false, policy.refillPeriod());
-			}
+		if (!buckets.containsKey(key) && buckets.size() >= maxTrackedKeys) {
+			makeRoom(buckets, now, periodNanos);
 		}
 
-		Bucket bucket = buckets.computeIfAbsent(id, k -> new Bucket(policy.capacity(), now));
+		Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(policy.capacity(), now));
 		synchronized (bucket) {
 			double refill = (double) (now - bucket.lastNanos) / periodNanos * policy.capacity();
 			bucket.tokens = Math.min(policy.capacity(), bucket.tokens + refill);
@@ -74,13 +72,27 @@ public class RateLimiter {
 		}
 	}
 
-	private void sweep(long now) {
-		buckets.entrySet().removeIf(e -> {
-			long periodNanos = policies.get(e.getKey().policy()).refillPeriod().toNanos();
-			synchronized (e.getValue()) {
-				return now - e.getValue().lastNanos >= periodNanos;
+	/** Drops idle buckets; if none were idle, drops the least recently used one. */
+	private static void makeRoom(ConcurrentHashMap<String, Bucket> buckets, long now, long periodNanos) {
+		String lruKey = null;
+		long lruNanos = Long.MAX_VALUE;
+		boolean sweptAny = false;
+		for (var entry : buckets.entrySet()) {
+			long last;
+			synchronized (entry.getValue()) {
+				last = entry.getValue().lastNanos;
 			}
-		});
+			if (now - last >= periodNanos) {
+				sweptAny |= buckets.remove(entry.getKey(), entry.getValue());
+			}
+			else if (last < lruNanos) {
+				lruNanos = last;
+				lruKey = entry.getKey();
+			}
+		}
+		if (!sweptAny && lruKey != null) {
+			buckets.remove(lruKey);
+		}
 	}
 
 	private long nanosNow() {

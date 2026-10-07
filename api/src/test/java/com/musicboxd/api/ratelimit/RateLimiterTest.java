@@ -95,14 +95,27 @@ class RateLimiterTest {
 	}
 
 	@Test
-	void idleKeysAreEvictedAndLiveKeysFailClosedWhenFull() {
+	void fullPolicyEvictsLeastRecentlyUsedKeyInsteadOfRejectingNewCallers() {
 		var l = limiter(2);
-		assertThat(l.tryAcquire("a", "k1").allowed()).isTrue();
-		assertThat(l.tryAcquire("a", "k2").allowed()).isTrue();
-		// Map full of live (recently used) keys: a new key is rejected, not admitted.
-		assertThat(l.tryAcquire("a", "k3").allowed()).isFalse();
-		// After a full refill period k1/k2 are idle and get swept, so k3 fits.
-		clock.advance(Duration.ofMinutes(2));
+		l.tryAcquire("a", "k1");
+		clock.advance(Duration.ofSeconds(1));
+		for (int i = 0; i < 3; i++) {
+			l.tryAcquire("a", "k2"); // k2 exhausted and most recently used
+		}
+		// Full of live keys: a new caller is still served (k1, the LRU key, is evicted)...
 		assertThat(l.tryAcquire("a", "k3").allowed()).isTrue();
+		// ...and the recently used, exhausted k2 keeps its bucket.
+		assertThat(l.tryAcquire("a", "k2").allowed()).isFalse();
+	}
+
+	@Test
+	void keyFloodOnOnePolicyDoesNotTouchAnotherPolicysBuckets() {
+		var l = limiter(2);
+		l.tryAcquire("b", "victim"); // policy b: capacity 1, now exhausted
+		for (int i = 0; i < 100; i++) {
+			assertThat(l.tryAcquire("a", "flood-" + i).allowed()).isTrue();
+		}
+		// The flood on policy a neither rejected anyone nor evicted b's bucket.
+		assertThat(l.tryAcquire("b", "victim").allowed()).isFalse();
 	}
 }
