@@ -144,7 +144,8 @@ sudo grep -E '^(BACKUP_BUCKET|AWS_REGION)=' /etc/musicboxd/stack.env
 
 ```bash
 sudo cp /opt/musicboxd/systemd/musicboxd-db-backup.* /etc/systemd/system/
-sudo systemd-analyze verify /etc/systemd/system/musicboxd-db-backup.service   # no output = OK
+sudo systemd-analyze verify /etc/systemd/system/musicboxd-db-backup.service 2>&1 | grep musicboxd || echo "unit OK"
+# expect: unit OK. Warnings about other units (e.g. acpid.socket and /var/run) come from OS units and are harmless.
 sudo systemctl daemon-reload
 sudo systemctl enable --now musicboxd-db-backup.timer
 systemctl list-timers musicboxd-db-backup.timer   # NEXT must be in the future
