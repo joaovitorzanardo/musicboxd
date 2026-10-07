@@ -33,11 +33,8 @@ esac
 exit 0
 STUB
 cp "$HERE/fake-aws" "$TMP/bin/aws"
-HAVE_FLOCK=1
-if ! command -v flock >/dev/null 2>&1; then
-  HAVE_FLOCK=0
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/bin/flock"   # no-op so the script runs here
-fi
+source "$HERE/lib.sh"
+stub_flock_if_missing
 chmod +x "$TMP/bin/"*
 export PATH="$TMP/bin:$PATH"
 
@@ -47,11 +44,6 @@ reset() {
   rm -rf "$TMP/s3"/* "$TMP/s3/.fail_cp"
   rm -f "$TMP/fail_dump" "$TMP/empty_dump" "$TMP/bad_archive" "$TMP/truncated_archive" "$TMP/checked.dump" "$TMP/lock_held_during_upload"
   : > "$TMP/docker.log"
-}
-expect_rc() {  # expect_rc <code> <command...>; output lands in $TMP/out
-  local want=$1; shift
-  set +e; "$@" > "$TMP/out" 2>&1; local rc=$?; set -e
-  [ "$rc" = "$want" ] || { echo "expected rc=$want, got $rc:"; cat "$TMP/out"; exit 1; }
 }
 work_empty() { [ -z "$(ls -A "$TMP/work")" ] || { echo "temp files left behind:"; ls -la "$TMP/work"; exit 1; }; }
 
