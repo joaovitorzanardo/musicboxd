@@ -17,10 +17,7 @@ COMPARE=${COMPARE:-1}
 KEEP=${KEEP:-0}
 KEY=${1:-}
 
-env_get() { sed -n "s/^$1=//p" "$ENV_FILE" | tail -1; }
-BUCKET=$(env_get BACKUP_BUCKET)
-REGION=$(env_get AWS_REGION)
-[[ -n $BUCKET && -n $REGION ]] || { echo "BACKUP_BUCKET and AWS_REGION must be set in $ENV_FILE" >&2; exit 2; }
+source backup/stack-env.sh      # BUCKET, REGION (validated; exit 2 on bad config)
 [[ -r $PG_ENV_FILE ]] || { echo "Cannot read $PG_ENV_FILE" >&2; exit 2; }
 
 if [[ -z $KEY ]]; then
@@ -36,15 +33,17 @@ COMPOSE=(docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml)
 TMP=$(mktemp -d "$WORK_DIR/musicboxd-restore.XXXXXX")
 cleanup() {
   rm -rf "$TMP"
-  if [[ $KEEP != 1 ]]; then docker rm -f "$RESTORE_CONTAINER" >/dev/null 2>&1 || true; fi
+  if [[ $KEEP != 1 ]]; then docker rm -fv "$RESTORE_CONTAINER" >/dev/null 2>&1 || true; fi
 }
 trap cleanup EXIT
 
 # One line per table: "<schema>.<table>|<row count>|<md5 of all rows in text order>".
-# Sequences, views and roles are not compared.
+# Sequences, views and roles are not compared. ROW(alias.*) always means the whole row, even when a table has a
+# column with the alias's name (a bare alias would resolve to that column). COLLATE "C" keeps the order
+# independent of the database locale.
 FINGERPRINT_SQL=$(cat <<'SQL'
 SELECT format(
-  'SELECT %L || ''|'' || count(*) || ''|'' || coalesce(md5(string_agg(t::text, E''\n'' ORDER BY t::text)), ''-'') FROM %I.%I t',
+  'SELECT %L || ''|'' || count(*) || ''|'' || coalesce(md5(string_agg(ROW(fp_row_.*)::text, E''\n'' ORDER BY ROW(fp_row_.*)::text COLLATE "C")), ''-'') FROM %I.%I fp_row_',
   n.nspname || '.' || c.relname, n.nspname, c.relname)
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE c.relkind = 'r'
@@ -62,7 +61,7 @@ echo "Downloading s3://$BUCKET/$KEY"
 aws s3 cp "s3://$BUCKET/$KEY" "$TMP/db.dump" --region "$REGION" --only-show-errors \
   || { echo "Download failed" >&2; exit 1; }
 
-docker rm -f "$RESTORE_CONTAINER" >/dev/null 2>&1 || true
+docker rm -fv "$RESTORE_CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$RESTORE_CONTAINER" --network none --env-file "$PG_ENV_FILE" "$RESTORE_IMAGE" >/dev/null
 
 # The image's first-start init runs a socket-only server and then restarts it; TCP on 127.0.0.1 answers
@@ -96,5 +95,5 @@ if [[ $COMPARE == 1 ]]; then
   fi
 fi
 if [[ $KEEP == 1 ]]; then
-  echo "Kept container $RESTORE_CONTAINER; remove it with: docker rm -f $RESTORE_CONTAINER"
+  echo "Kept container $RESTORE_CONTAINER; remove it (and its data volume) with: docker rm -fv $RESTORE_CONTAINER"
 fi

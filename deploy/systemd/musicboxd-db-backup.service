@@ -8,3 +8,6 @@ Requires=docker.service
 Type=oneshot
 WorkingDirectory=/opt/musicboxd
 ExecStart=/opt/musicboxd/backup/backup-db.sh
+# oneshot units have no start timeout by default: a hung dump or upload would sit in "activating" forever,
+# skipping every later run without ever showing as failed.
+TimeoutStartSec=1h

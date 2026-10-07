@@ -107,7 +107,7 @@ sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.y
 Clean up:
 
 ```bash
-sudo docker rm -f musicboxd-restore-check
+sudo docker rm -fv musicboxd-restore-check     # -v: also removes the anonymous volume holding the restored data
 sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml exec -T postgres \
   sh -c 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP SCHEMA ops_restore_drill CASCADE"'
 ```
@@ -141,10 +141,19 @@ aws s3 rm s3://musicboxd-backups/postgres/<a key from above> --region us-east-1 
 
 ## Day-to-day checks
 
-- Is the backup running? `systemctl list-timers musicboxd-db-backup.timer` and `systemctl --failed`.
-  A failed run leaves the unit in `failed` state until the next success. Newest object:
-  `aws s3 ls s3://musicboxd-backups/postgres/ --region us-east-1 | tail -1`.
-- **No alarm fires on a failed backup yet.** Follow-up: alert when the newest object is older than 26h.
+- **Every Monday**, check that the backup is running. A failed run leaves the unit in `failed` state until
+  the next success, and a hung run is killed after 1 hour (`TimeoutStartSec`) and shows as failed:
+
+  ```bash
+  systemctl list-timers musicboxd-db-backup.timer     # LAST within the past ~24h
+  systemctl --failed                                  # musicboxd-db-backup.service must not be listed
+  aws s3 ls s3://musicboxd-backups/postgres/ --region us-east-1 | tail -1   # stamped within the past ~24h
+  ```
+
+- **Risk: no alarm fires on a failed backup yet, and the lifecycle does not wait for newer dumps.** If the timer
+  silently stops (a bad `stack.env` edit, the unit not re-enabled after a host rebuild), the last good dump
+  still expires after 30 days + 7 noncurrent, and then **no backup exists at all**. The weekly check above is
+  the only guard until the freshness alarm ticket (alert when the newest object is older than 26h) ships.
 - Re-run the drill after any Postgres major-version change (`postgres:18` → 19). `RESTORE_IMAGE` must match
   the service image, and `restore-check.sh`'s default must be bumped with it.
 - Once real users write data, a live comparison shows writes made after the dump as `MISMATCH`. For a drill

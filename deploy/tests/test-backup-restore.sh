@@ -23,11 +23,14 @@ export ENV_FILE=$TMP/stack.env PG_ENV_FILE=$TMP/postgres.env LOCK_FILE=$TMP/lock
 COMPOSE=(docker compose --env-file "$TMP/stack.env" -f "$DEPLOY/docker-compose.prod.yml")
 cleanup() {
   "${COMPOSE[@]}" down -v >/dev/null 2>&1 || true
-  docker rm -f "$RESTORE_CONTAINER" >/dev/null 2>&1 || true
+  docker rm -fv "$RESTORE_CONTAINER" >/dev/null 2>&1 || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 "${COMPOSE[@]}" down -v >/dev/null 2>&1 || true
+# postgres:18 declares VOLUME /var/lib/postgresql: a drill must not leave that anonymous volume (a full data copy) behind.
+dangling_volumes() { docker volume ls -q --filter dangling=true | sort; }
+VOLS_BEFORE=$(dangling_volumes)
 
 src_psql() { "${COMPOSE[@]}" exec -T postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'; }
 expect_rc() {  # expect_rc <code> <command...>; output lands in $TMP/out
@@ -54,6 +57,8 @@ SELECT g,
        '2026-01-01T00:00:00Z'::timestamptz + g * interval '1 hour',
        jsonb_build_object('g', g, 'tags', jsonb_build_array('a', 'b'))
 FROM generate_series(1, 500) g;
+CREATE TABLE drill.tcol (t int, other text);   -- a column named like the fingerprint's row alias
+INSERT INTO drill.tcol VALUES (1, 'x'), (2, 'y');
 CREATE SCHEMA other;
 CREATE TABLE other.empty_table (id int);
 SQL
@@ -78,16 +83,22 @@ echo "case 2 (restore matches) OK"
 KEEP=1 expect_rc 0 bash "$DEPLOY/backup/restore-check.sh" "$KEY"
 NULLS=$(docker exec "$RESTORE_CONTAINER" sh -c 'psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) FROM drill.items WHERE note IS NULL"')
 [ "$NULLS" = 10 ]
-docker rm -f "$RESTORE_CONTAINER" >/dev/null
+docker rm -fv "$RESTORE_CONTAINER" >/dev/null   # what the KEEP message and the runbook tell the operator
 echo "case 3 (KEEP=1) OK"
 
 # 4 live data changed after the dump -> MISMATCH naming the table, exit 1
 echo "UPDATE drill.items SET note = 'tampered' WHERE id = 7;" | src_psql
 expect_rc 1 bash "$DEPLOY/backup/restore-check.sh"
 grep -q '^MISMATCH' "$TMP/out"
-grep -q 'drill\.items' "$TMP/out"
+grep -Eq '^[<>] drill\.items\|' "$TMP/out"
 no_restore_container
 echo "case 4 (mismatch detected) OK"
+
+# 4b a change in a table that has a column named `t` is still caught
+echo "UPDATE drill.tcol SET other = 'DIFFERENT' WHERE t = 1;" | src_psql
+expect_rc 1 bash "$DEPLOY/backup/restore-check.sh"
+grep -Eq '^[<>] drill\.tcol\|' "$TMP/out" || { echo "change in drill.tcol not in the diff:"; cat "$TMP/out"; exit 1; }
+echo "case 4b (column named t) OK"
 
 # 5 keys that are not ours are refused before anything runs
 for bad in 'postgres/../etc/passwd' 'other/musicboxd-20261007T043000Z.dump' 'postgres/musicboxd-latest.dump'; do
@@ -109,5 +120,16 @@ rm -rf "$TMP/s3/test-bucket"
 expect_rc 2 bash "$DEPLOY/backup/restore-check.sh"
 grep -q 'No dumps' "$TMP/out"
 echo "case 7 (no dumps) OK"
+
+# 8 restore-check validates the bucket like backup-db.sh does
+printf 'DOMAIN=example.test\nBACKUP_BUCKET=Bad_Bucket!\nAWS_REGION=us-east-1\n' > "$TMP/bad.env"
+ENV_FILE=$TMP/bad.env expect_rc 2 bash "$DEPLOY/backup/restore-check.sh"
+grep -q 'Invalid BACKUP_BUCKET' "$TMP/out"
+echo "case 8 (bad bucket) OK"
+
+# 9 no drill left an anonymous data volume behind
+NEW_VOLS=$(comm -13 <(echo "$VOLS_BEFORE") <(dangling_volumes))
+[ -z "$NEW_VOLS" ] || { echo "drill leaked anonymous volumes: $NEW_VOLS"; exit 1; }
+echo "case 9 (no leaked volumes) OK"
 
 echo "backup/restore end-to-end tests OK"

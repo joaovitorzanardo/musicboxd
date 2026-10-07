@@ -11,7 +11,8 @@ printf 'DOMAIN=example.test\nBACKUP_BUCKET=test-bucket\nAWS_REGION=us-east-1\n' 
 : > "$TMP/docker.log"
 
 # Stub docker: `exec ... pg_dump` prints a fake archive (or fails / prints nothing, by flag file);
-# `exec ... pg_restore -l` records the bytes it was given and fails if flagged.
+# `exec ... pg_restore` records the bytes it was given and fails if flagged. A truncated archive (header
+# intact) still passes `pg_restore -l` and fails only a full read.
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "docker $*" >> "$STUB_TMP/docker.log"
@@ -23,6 +24,10 @@ case " $* " in
   *pg_restore*)
     cat > "$STUB_TMP/checked.dump"
     [ -f "$STUB_TMP/bad_archive" ] && { echo "pg_restore: error: input file does not appear to be a valid archive" >&2; exit 1; }
+    case " $* " in
+      *" -l "*) ;;
+      *) [ -f "$STUB_TMP/truncated_archive" ] && { echo "pg_restore: error: could not read from input file: end of file" >&2; exit 1; } ;;
+    esac
     ;;
 esac
 exit 0
@@ -40,7 +45,7 @@ run_backup() { ENV_FILE="${ENV:-$TMP/stack.env}" LOCK_FILE="$TMP/lock" WORK_DIR=
 objects() { find "$TMP/s3" -type f -name '*.dump' | wc -l | tr -d ' '; }
 reset() {
   rm -rf "$TMP/s3"/* "$TMP/s3/.fail_cp"
-  rm -f "$TMP/fail_dump" "$TMP/empty_dump" "$TMP/bad_archive" "$TMP/checked.dump"
+  rm -f "$TMP/fail_dump" "$TMP/empty_dump" "$TMP/bad_archive" "$TMP/truncated_archive" "$TMP/checked.dump" "$TMP/lock_held_during_upload"
   : > "$TMP/docker.log"
 }
 expect_rc() {  # expect_rc <code> <command...>; output lands in $TMP/out
@@ -88,7 +93,8 @@ grep -q 'Upload to s3://test-bucket/postgres/musicboxd-.* failed' "$TMP/out"; wo
 echo "case 5 (upload fails) OK"
 
 # 6 bad config -> exit 2 before touching docker
-for cfg in 'AWS_REGION=us-east-1' 'BACKUP_BUCKET=test-bucket' $'BACKUP_BUCKET=Bad_Bucket!\nAWS_REGION=us-east-1'; do
+for cfg in 'AWS_REGION=us-east-1' 'BACKUP_BUCKET=test-bucket' $'BACKUP_BUCKET=Bad_Bucket!\nAWS_REGION=us-east-1' \
+           $'BACKUP_BUCKET=test-bucket\nAWS_REGION=us east 1'; do
   reset; printf 'DOMAIN=example.test\n%s\n' "$cfg" > "$TMP/bad.env"
   ENV=$TMP/bad.env expect_rc 2 run_backup
   [ ! -s "$TMP/docker.log" ] || { echo "docker was called with bad config"; exit 1; }
@@ -107,5 +113,36 @@ if [ "$HAVE_FLOCK" = 1 ]; then
   echo "case 7 (lock wait) OK"
 else
   echo "case 7 SKIPPED: flock not available on this host"
+fi
+
+# 8 inline comments and trailing spaces in stack.env are ignored (dotenv style, as prod.env.example writes them)
+reset
+printf 'DOMAIN=example.test\nBACKUP_BUCKET=test-bucket    # MBD-11 note\nAWS_REGION=us-east-1  # region \n' > "$TMP/commented.env"
+ENV=$TMP/commented.env expect_rc 0 run_backup
+[ -n "$(find "$TMP/s3/test-bucket/postgres" -name '*.dump' 2>/dev/null)" ] \
+  || { echo "commented env did not upload to test-bucket"; cat "$TMP/out"; exit 1; }
+echo "case 8 (inline comments) OK"
+
+# 9 truncated archive whose header still lists fine -> nothing uploaded
+reset; touch "$TMP/truncated_archive"
+expect_rc 1 run_backup
+[ "$(objects)" = 0 ]; grep -q 'not a readable archive' "$TMP/out"; work_empty
+echo "case 9 (truncated archive) OK"
+
+# 10 the deploy lock is released before the upload, so a slow or hung upload never blocks deploys
+if [ "$HAVE_FLOCK" = 1 ]; then
+  reset; mv "$TMP/bin/aws" "$TMP/bin/aws-real"
+  cat > "$TMP/bin/aws" <<'STUB'
+#!/usr/bin/env bash
+flock -n "$STUB_TMP/lock" true || touch "$STUB_TMP/lock_held_during_upload"
+exec "$STUB_TMP/bin/aws-real" "$@"
+STUB
+  chmod +x "$TMP/bin/aws"
+  expect_rc 0 run_backup
+  mv "$TMP/bin/aws-real" "$TMP/bin/aws"
+  [ ! -f "$TMP/lock_held_during_upload" ] || { echo "deploy lock still held during upload"; exit 1; }
+  echo "case 10 (lock released before upload) OK"
+else
+  echo "case 10 SKIPPED: flock not available on this host"
 fi
 echo "backup script tests OK"
