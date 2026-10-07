@@ -1,7 +1,5 @@
 package com.musicboxd.api.ratelimit;
 
-import java.time.Clock;
-
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,7 +19,7 @@ public class RateLimitConfig implements WebMvcConfigurer {
 	private final BeanFactory beans;
 
 	public RateLimitConfig(RateLimitProperties properties, BeanFactory beans) {
-		this.limiter = new RateLimiter(properties.policies(), Clock.systemUTC(), MAX_TRACKED_KEYS);
+		this.limiter = new RateLimiter(properties.policies(), MAX_TRACKED_KEYS);
 		this.beans = beans;
 	}
 

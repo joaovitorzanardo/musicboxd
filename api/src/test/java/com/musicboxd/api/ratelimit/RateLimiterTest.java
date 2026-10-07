@@ -3,54 +3,39 @@ package com.musicboxd.api.ratelimit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 /**
  * Token-bucket semantics of the per-user limiter (AD-10), driven by a hand-advanced
- * clock so refill is tested without sleeping.
+ * nanosecond source so refill is tested without sleeping.
  */
 class RateLimiterTest {
 
-	/** Mutable clock so tests control refill without sleeping. */
-	static class TestClock extends Clock {
+	/** Monotonic time source the tests advance by hand. */
+	static class FakeNanoTime {
 
-		private Instant now = Instant.parse("2026-01-01T00:00:00Z");
+		private long nanos;
 
 		void advance(Duration d) {
-			now = now.plus(d);
+			nanos += d.toNanos();
 		}
 
-		@Override
-		public ZoneId getZone() {
-			return ZoneOffset.UTC;
-		}
-
-		@Override
-		public Clock withZone(ZoneId zone) {
-			return this;
-		}
-
-		@Override
-		public Instant instant() {
-			return now;
+		long read() {
+			return nanos;
 		}
 	}
 
-	private final TestClock clock = new TestClock();
+	private final FakeNanoTime clock = new FakeNanoTime();
 
 	private final Map<String, RateLimitPolicy> policies = Map.of(
 		"a", new RateLimitPolicy(3, Duration.ofMinutes(1)),
 		"b", new RateLimitPolicy(1, Duration.ofMinutes(1)));
 
 	private RateLimiter limiter(int maxTrackedKeys) {
-		return new RateLimiter(policies, clock, maxTrackedKeys);
+		return new RateLimiter(policies, maxTrackedKeys, clock::read);
 	}
 
 	@Test
@@ -95,17 +80,15 @@ class RateLimiterTest {
 	}
 
 	@Test
-	void fullPolicyEvictsLeastRecentlyUsedKeyInsteadOfRejectingNewCallers() {
+	void fullPolicyKeepsServingNewCallersInsteadOfRejectingThem() {
 		var l = limiter(2);
-		l.tryAcquire("a", "k1");
-		clock.advance(Duration.ofSeconds(1));
 		for (int i = 0; i < 3; i++) {
-			l.tryAcquire("a", "k2"); // k2 exhausted and most recently used
+			l.tryAcquire("a", "k1"); // k1 exhausted
 		}
-		// Full of live keys: a new caller is still served (k1, the LRU key, is evicted)...
-		assertThat(l.tryAcquire("a", "k3").allowed()).isTrue();
-		// ...and the recently used, exhausted k2 keeps its bucket.
-		assertThat(l.tryAcquire("a", "k2").allowed()).isFalse();
+		// Far more distinct callers than tracked slots: none of them is turned away.
+		for (int i = 0; i < 100; i++) {
+			assertThat(l.tryAcquire("a", "new-" + i).allowed()).isTrue();
+		}
 	}
 
 	@Test

@@ -21,6 +21,9 @@ repositories {
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
+	// Per-user rate limiting (AD-10): token buckets, held in a bounded per-policy cache.
+	implementation("com.bucket4j:bucket4j_jdk17-core:8.21.0")
+	implementation("com.github.ben-manes.caffeine:caffeine")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
