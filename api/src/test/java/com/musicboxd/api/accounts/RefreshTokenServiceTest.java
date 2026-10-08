@@ -177,6 +177,99 @@ class RefreshTokenServiceTest {
 		}
 	}
 
+	@Test
+	void revokedTokenCanNoLongerRefresh() {
+		String raw = refreshTokens.issue(newAccount());
+
+		refreshTokens.revoke(raw);
+
+		assertThatThrownBy(() -> refreshTokens.rotate(raw)).isInstanceOf(InvalidRefreshTokenException.class);
+	}
+
+	@Test
+	void revokeMarksTheFamilyRevokedWithoutTouchingExpiry() {
+		String raw = refreshTokens.issue(newAccount());
+
+		refreshTokens.revoke(raw);
+
+		// Revoked, not merely expired-looking: the token is still within its 30 days.
+		var row = jdbc.sql("""
+				SELECT f.revoked_at, t.expires_at FROM accounts.refresh_tokens t
+				JOIN accounts.refresh_token_families f ON f.id = t.family_id WHERE t.token_hash = :hash""")
+			.param("hash", OpaqueTokens.hash(raw))
+			.query((rs, n) -> new OffsetDateTime[] { rs.getObject("revoked_at", OffsetDateTime.class),
+					rs.getObject("expires_at", OffsetDateTime.class) })
+			.single();
+		assertThat(row[0]).isNotNull();
+		assertThat(row[1]).isAfter(OffsetDateTime.now(ZoneOffset.UTC).plusDays(29));
+	}
+
+	@Test
+	void revokeKillsEveryTokenOfTheFamily() {
+		String first = refreshTokens.issue(newAccount());
+		var tabA = refreshTokens.rotate(first);
+		var tabB = refreshTokens.rotate(first); // grace-window sibling
+
+		refreshTokens.revoke(tabA.refreshToken());
+
+		assertThatThrownBy(() -> refreshTokens.rotate(tabB.refreshToken()))
+			.isInstanceOf(InvalidRefreshTokenException.class);
+		assertThatThrownBy(() -> refreshTokens.rotate(first)).isInstanceOf(InvalidRefreshTokenException.class);
+	}
+
+	@Test
+	void revokeLeavesOtherSessionsAlone() {
+		UUID account = newAccount();
+		String laptop = refreshTokens.issue(account);
+		String phone = refreshTokens.issue(account);
+
+		refreshTokens.revoke(laptop);
+
+		assertThat(refreshTokens.rotate(phone).accountId()).isEqualTo(account);
+	}
+
+	@Test
+	void revokeIsIdempotentAndIgnoresUnknownOrExpiredTokens() {
+		String raw = refreshTokens.issue(newAccount());
+		refreshTokens.revoke(raw);
+		refreshTokens.revoke(raw);
+		refreshTokens.revoke("not-a-real-token");
+
+		String expired = refreshTokens.issue(newAccount());
+		jdbc.sql("UPDATE accounts.refresh_tokens SET expires_at = :past WHERE token_hash = :hash")
+			.param("past", OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1))
+			.param("hash", OpaqueTokens.hash(expired)).update();
+		refreshTokens.revoke(expired);
+
+		assertThatThrownBy(() -> refreshTokens.rotate(raw)).isInstanceOf(InvalidRefreshTokenException.class);
+	}
+
+	@Test
+	void logoutAlsoKillsASuccessorThatIsBeingIssuedConcurrently() throws Exception {
+		String current = refreshTokens.issue(newAccount());
+
+		var rotated = new CountDownLatch(1);
+		var commit = new CountDownLatch(1);
+		try (var pool = Executors.newFixedThreadPool(2)) {
+			// Another tab refreshes; its transaction holds the locks and has not committed yet.
+			Future<String> successor = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+				String next = refreshTokens.rotate(current).refreshToken();
+				rotated.countDown();
+				await(commit);
+				return next;
+			}));
+			assertThat(rotated.await(10, SECONDS)).isTrue();
+			// Meanwhile the person clicks logout in this tab, with the same cookie.
+			Future<?> logout = pool.submit(() -> refreshTokens.revoke(current));
+			Thread.sleep(500); // let the logout reach the database and block on the row lock
+			commit.countDown();
+			logout.get(10, SECONDS);
+
+			String next = successor.get(10, SECONDS);
+			assertThatThrownBy(() -> refreshTokens.rotate(next)).isInstanceOf(InvalidRefreshTokenException.class);
+		}
+	}
+
 	private UUID newAccount() {
 		return accounts.register(uniqueEmail(), "correct-horse", uniqueUsername()).id();
 	}
