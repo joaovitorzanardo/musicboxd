@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,12 +30,14 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.jayway.jsonpath.JsonPath;
 import com.musicboxd.api.TestcontainersConfiguration;
+import com.musicboxd.api.mail.MailTestConfiguration;
+import com.musicboxd.api.mail.RecordingMailSender;
 import com.musicboxd.api.security.AuthProperties;
 
 /** MBD-17 acceptance, over HTTP: register, log in, call the protected endpoint. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, MailTestConfiguration.class })
 class AuthFlowTest {
 
 	private static final String PASSWORD = "correct-horse";
@@ -51,19 +54,21 @@ class AuthFlowTest {
 	@Autowired
 	private AuthProperties authProperties;
 
+	@Autowired
+	private RecordingMailSender mail;
+
 	@Test
 	void newPersonRegistersLogsInAndCallsTheProtectedEndpoint() throws Exception {
 		String email = uniqueEmail();
 		String username = uniqueUsername();
 
-		String registered = register(email, PASSWORD, username)
+		register(email, PASSWORD, username)
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.id").isString())
 			.andExpect(jsonPath("$.email").value(email))
 			.andExpect(jsonPath("$.username").value(username))
-			.andExpect(jsonPath("$.password").doesNotExist())
-			.andReturn().getResponse().getContentAsString();
-		markVerified(registered);
+			.andExpect(jsonPath("$.password").doesNotExist());
+		verifyViaEmailedLink(email);
 
 		String body = login(email, PASSWORD)
 			.andExpect(status().isOk())
@@ -81,11 +86,10 @@ class AuthFlowTest {
 	@Test
 	void emailWithSurroundingWhitespaceRegistersLowercasedOverHttp() throws Exception {
 		String email = uniqueEmail();
-		String registered = register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername())
+		register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername())
 			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.email").value(email))
-			.andReturn().getResponse().getContentAsString();
-		markVerified(registered);
+			.andExpect(jsonPath("$.email").value(email));
+		verifyViaEmailedLink(email);
 		login(email, PASSWORD).andExpect(status().isOk());
 	}
 
@@ -179,8 +183,68 @@ class AuthFlowTest {
 		register(uniqueEmail(), PASSWORD, username.toUpperCase()).andExpect(status().isConflict());
 	}
 
-	private void markVerified(String registerResponseBody) {
-		AccountServiceTest.markVerified(jdbc, UUID.fromString(JsonPath.read(registerResponseBody, "$.id")));
+	@Test
+	void unverifiedAccountCannotLogInUntilTheEmailedLinkIsVisited() throws Exception {
+		String email = uniqueEmail();
+		register(email, PASSWORD, uniqueUsername()).andExpect(status().isCreated());
+
+		login(email, PASSWORD)
+			.andExpect(status().isForbidden())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.type").value(EmailNotVerifiedException.TYPE.toString()))
+			.andExpect(jsonPath("$.title").value("Email not verified"))
+			.andExpect(jsonPath("$.accessToken").doesNotExist());
+
+		verifyViaEmailedLink(email);
+		verifyViaEmailedLink(email); // second visit: still 200
+
+		login(email, PASSWORD).andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").isString());
+	}
+
+	@Test
+	void verifyRejectsMissingUnknownAndOverlongTokens() throws Exception {
+		mockMvc.perform(get("/api/v1/auth/verify")).andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/v1/auth/verify").queryParam("token", ""))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(get("/api/v1/auth/verify").queryParam("token", "unknown"))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.status").value(400));
+		mockMvc.perform(get("/api/v1/auth/verify").queryParam("token", "x".repeat(10_000)))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void resendAnswers202ForAnyEmailAndIsLimitedPerIp() throws Exception {
+		String email = uniqueEmail();
+		register(email, PASSWORD, uniqueUsername()).andExpect(status().isCreated());
+
+		String ip = "203.0.113.7";
+		resend(email, ip).andExpect(status().isAccepted()).andExpect(content().string(""));
+		resend(uniqueEmail(), ip).andExpect(status().isAccepted()).andExpect(content().string("")); // unknown: same answer
+		assertThat(mail.sentTo(email)).hasSize(2);
+		resend(email, ip).andExpect(status().isAccepted());
+		resend(email, ip).andExpect(status().isTooManyRequests()).andExpect(header().exists("Retry-After"));
+		resend(email, "203.0.113.8").andExpect(status().isAccepted());
+
+		resend("not-an-email-at-all".repeat(20), "203.0.113.9").andExpect(status().isBadRequest());
+	}
+
+	private void verifyViaEmailedLink(String email) throws Exception {
+		mockMvc.perform(get(URI.create(mail.verificationLink(email))))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("verified"));
+	}
+
+	private ResultActions resend(String email, String clientIp) throws Exception {
+		return mockMvc.perform(post("/api/v1/auth/verification-email")
+			.with(request -> {
+				request.setRemoteAddr(clientIp);
+				return request;
+			})
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+				{"email":"%s"}""".formatted(email)));
 	}
 
 	private ResultActions register(String email, String password, String username) throws Exception {

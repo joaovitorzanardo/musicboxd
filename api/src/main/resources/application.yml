@@ -33,6 +33,10 @@ musicboxd:
       demo:
         capacity: 5
         refill-period: 1m
+      # MBD-18 resend: unauthenticated, so keyed per client IP. MBD-23 adds per-email limits.
+      verification-email:
+        capacity: 3
+        refill-period: 15m
   auth:
     # Base64 of >= 32 random bytes (openssl rand -base64 32), from /etc/musicboxd/api.env.
     # No default on purpose: the api refuses to start without it.
