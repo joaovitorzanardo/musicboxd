@@ -29,14 +29,14 @@ class AccountRepository {
 	}
 
 	Optional<Account> findByEmail(String email) {
-		return jdbc.sql("SELECT id, email, password_hash, email_verified_at FROM accounts.accounts WHERE lower(email) = lower(:email)")
+		return jdbc.sql("SELECT id, email, password_hash, email_verified_at, role FROM accounts.accounts WHERE lower(email) = lower(:email)")
 			.param("email", email)
 			.query(Account.class)
 			.optional();
 	}
 
 	Optional<Account> findById(UUID id) {
-		return jdbc.sql("SELECT id, email, password_hash, email_verified_at FROM accounts.accounts WHERE id = :id")
+		return jdbc.sql("SELECT id, email, password_hash, email_verified_at, role FROM accounts.accounts WHERE id = :id")
 			.param("id", id)
 			.query(Account.class)
 			.optional();

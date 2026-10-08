@@ -136,7 +136,7 @@ class AuthFlowTest {
 
 		var expired = new TokenService(jwtEncoder, authProperties,
 				Clock.fixed(Instant.now().minus(Duration.ofHours(1)), ZoneOffset.UTC))
-			.issue(UUID.randomUUID());
+			.issue(UUID.randomUUID(), Role.USER);
 		mockMvc.perform(get("/api/v1/accounts/me").header("Authorization", "Bearer " + expired.value()))
 			.andExpect(status().isUnauthorized());
 	}

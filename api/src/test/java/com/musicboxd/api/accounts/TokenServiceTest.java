@@ -30,11 +30,20 @@ class TokenServiceTest {
 	private final JwtDecoder decoder = jwt.jwtDecoder(props);
 
 	@Test
+	void tokenCarriesTheRoleClaim() {
+		var staff = serviceAt(Instant.now(), props).issue(UUID.randomUUID(), Role.STAFF);
+		var user = serviceAt(Instant.now(), props).issue(UUID.randomUUID(), Role.USER);
+
+		assertThat(decoder.decode(staff.value()).getClaimAsString(JwtConfig.ROLE_CLAIM)).isEqualTo("STAFF");
+		assertThat(decoder.decode(user.value()).getClaimAsString(JwtConfig.ROLE_CLAIM)).isEqualTo("USER");
+	}
+
+	@Test
 	void tokenCarriesTheAccountIdAndExpiresInFifteenMinutes() {
 		var accountId = UUID.randomUUID();
 		var now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 
-		var token = serviceAt(now, props).issue(accountId);
+		var token = serviceAt(now, props).issue(accountId, Role.USER);
 		Jwt decoded = decoder.decode(token.value());
 
 		assertThat(decoded.getSubject()).isEqualTo(accountId.toString());
@@ -46,7 +55,7 @@ class TokenServiceTest {
 
 	@Test
 	void expiredTokenIsRejected() {
-		var token = serviceAt(Instant.now().minus(Duration.ofHours(1)), props).issue(UUID.randomUUID());
+		var token = serviceAt(Instant.now().minus(Duration.ofHours(1)), props).issue(UUID.randomUUID(), Role.USER);
 		assertThatThrownBy(() -> decoder.decode(token.value())).isInstanceOf(JwtValidationException.class);
 	}
 
@@ -55,7 +64,7 @@ class TokenServiceTest {
 		String other = Base64.getEncoder()
 			.encodeToString("another-secret-of-at-least-32-bytes!!".getBytes(StandardCharsets.UTF_8));
 		var foreign = serviceAt(Instant.now(), new AuthProperties(other, Duration.ofMinutes(15)))
-			.issue(UUID.randomUUID());
+			.issue(UUID.randomUUID(), Role.USER);
 		assertThatThrownBy(() -> decoder.decode(foreign.value())).isInstanceOf(JwtException.class);
 	}
 

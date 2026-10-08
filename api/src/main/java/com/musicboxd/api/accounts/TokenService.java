@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import com.musicboxd.api.security.AuthProperties;
 import com.musicboxd.api.security.JwtConfig;
 
-/** Issues short-lived access tokens (AD-8). Refresh tokens are MBD-19. */
+/** Issues short-lived access tokens carrying the account's role (AD-8). */
 @Service
 public class TokenService {
 
@@ -31,11 +31,12 @@ public class TokenService {
 		this.clock = clock;
 	}
 
-	public AccessToken issue(UUID accountId) {
+	public AccessToken issue(UUID accountId, Role role) {
 		Instant now = clock.instant();
 		var claims = JwtClaimsSet.builder()
 			.issuer(JwtConfig.ISSUER)
 			.subject(accountId.toString())
+			.claim(JwtConfig.ROLE_CLAIM, role.name())
 			.issuedAt(now)
 			.expiresAt(now.plus(props.accessTokenTtl()))
 			.build();

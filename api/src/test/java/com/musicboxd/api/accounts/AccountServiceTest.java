@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.musicboxd.api.TestcontainersConfiguration;
@@ -124,6 +125,21 @@ class AccountServiceTest {
 	void describeUnknownAccountIsNotFound() {
 		assertThatThrownBy(() -> accounts.describe(UUID.randomUUID()))
 			.isInstanceOf(AccountNotFoundException.class);
+	}
+
+	@Test
+	void newAccountsAreUsersAndTheColumnRejectsUnknownRoles() {
+		AccountView view = accounts.register(uniqueEmail(), PASSWORD, uniqueUsername());
+
+		assertThat(accounts.roleOf(view.id())).isEqualTo(Role.USER);
+		assertThatThrownBy(() -> jdbc.sql("UPDATE accounts.accounts SET role = 'ROOT' WHERE id = :id")
+			.param("id", view.id()).update())
+			.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void roleOfAnUnknownAccountFails() {
+		assertThatThrownBy(() -> accounts.roleOf(UUID.randomUUID())).isInstanceOf(AccountNotFoundException.class);
 	}
 
 	/** Accounts in tests that are not about verification skip the email round trip. */

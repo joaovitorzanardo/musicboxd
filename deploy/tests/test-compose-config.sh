@@ -30,6 +30,7 @@ if grep -q 'SPRING_CLOUD_AWS_SES_ENABLED' <<<"$OUT"; then echo "the prod stack o
 if grep -qi 'AWS_SECRET_ACCESS_KEY\|AWS_ACCESS_KEY_ID' <<<"$OUT"; then echo "static AWS keys in the prod stack (AD-11)"; exit 1; fi
 grep -q 'POSTGRES_PASSWORD: x' <<<"$API" || { echo "api lacks postgres.env credentials"; exit 1; }
 if grep -q 'bG9jYWwtZGV2' <<<"$OUT"; then echo "the local-dev JWT secret reached the prod stack"; exit 1; fi
+if grep -q 'staff@localhost.test' <<<"$OUT"; then echo "the dev bootstrap STAFF email reached the prod stack"; exit 1; fi
 grep -q 'condition: service_healthy' <<<"$API" || { echo "api does not wait for a healthy postgres"; exit 1; }
 # Missing GHCR_OWNER / DOMAIN must fail fast with a clear message (not render empty values).
 if ERR=$(MUSICBOXD_ENV_DIR="$TMP" env -u GHCR_OWNER -u DOMAIN docker compose -f docker-compose.prod.yml config 2>&1 >/dev/null); then
