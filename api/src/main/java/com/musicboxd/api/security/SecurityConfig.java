@@ -33,7 +33,8 @@ public class SecurityConfig {
 		AuthenticationEntryPoint entryPoint = new ProblemDetailsAuthenticationEntryPoint();
 		http
 			// Bearer tokens are not cookie-borne, so CSRF does not apply to them. The one cookie, MBD-19's
-			// refresh token, is SameSite=Lax (no cross-site POSTs) and scoped to /api/v1/auth/refresh (AD-8).
+			// refresh token, is SameSite=Lax (no cross-site POST/DELETE) and scoped to /api/v1/auth/refresh,
+			// where POST refreshes and DELETE logs out (AD-8). A forged logout would only log the person out.
 			.csrf(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
@@ -41,6 +42,8 @@ public class SecurityConfig {
 				.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
 						"/api/v1/auth/verification-email", "/api/v1/auth/refresh").permitAll()
+				// Logout: the refresh cookie is the credential; an expired access token must not block it.
+				.requestMatchers(HttpMethod.DELETE, "/api/v1/auth/refresh").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/v1/auth/verify").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/v1/accounts/me").authenticated()
 				// GUARD: any authenticated GET must be listed ABOVE this line, or it becomes public.

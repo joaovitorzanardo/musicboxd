@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -108,6 +109,18 @@ public class AuthController {
 		}
 		var rotation = refreshTokens.rotate(refreshToken);
 		return withSession(rotation.accountId(), rotation.refreshToken());
+	}
+
+	/** Logout. The cookie is the credential, so it works after the access token expired; it always answers 204. */
+	@DeleteMapping("/refresh")
+	@ApiResponse(responseCode = "204",
+			description = "This session's refresh token is revoked (if there was one) and the cookie is cleared")
+	public ResponseEntity<Void> logout(
+			@CookieValue(name = RefreshCookies.NAME, required = false) String refreshToken) {
+		if (refreshToken != null && !refreshToken.isBlank()) {
+			refreshTokens.revoke(refreshToken);
+		}
+		return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, RefreshCookies.clear().toString()).build();
 	}
 
 	/** The emailed link points here. MBD-22 may move the link to an SPA page that calls this same endpoint. */
