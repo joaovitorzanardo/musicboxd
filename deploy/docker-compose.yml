@@ -18,9 +18,9 @@ services:
   postgres:
     image: postgres:18
     restart: on-failure
-    # Local-dev-only credentials, intentionally hardcoded here. Production
-    # secrets (env-file-based, per AD-11) are entry 1.5's job, not this
-    # ticket's -- see deferred-work.md and this plan's Review Triage Log.
+    # Local-dev-only credentials, intentionally hardcoded; no Postgres port is published.
+    # deploy.sh copies this file to the host with the rest of deploy/, but every host
+    # script uses docker-compose.prod.yml, which reads /etc/musicboxd/postgres.env (AD-11).
     environment:
       POSTGRES_DB: musicboxd
       POSTGRES_USER: musicboxd
@@ -33,7 +33,7 @@ services:
     networks:
       - internal
     # No ports published: Postgres is reachable only on the internal
-    # Docker network (AD-11) -- nothing reads/writes it in this ticket.
+    # Docker network (AD-11).
 
   nginx:
     build:

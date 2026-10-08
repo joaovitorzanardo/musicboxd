@@ -29,7 +29,20 @@ Musicboxd é um tracker musical e rede social para música, no espírito do Lett
 musicboxd/
   api/      # aplicação Spring Boot
   web/      # SPA em React (Vite)
-  deploy/   # docker-compose, configuração do nginx
+  deploy/   # Compose (local e produção), nginx, deploy.sh, backups, certbot, units systemd, políticas IAM e testes
+  docs/     # runbooks de operação e planos de implementação
 ```
+
+## Testes
+
+- API: `cd api && ./gradlew test`
+- Web: `cd web && npm test`
+- Scripts de deploy (bash; os marcados com Docker precisam do daemon rodando):
+  - `bash deploy/tests/test-deploy.sh`
+  - `bash deploy/tests/test-backup-db.sh`
+  - `bash deploy/tests/test-compose-config.sh` (Docker)
+  - `bash deploy/tests/test-nginx-conf.sh` (Docker)
+  - `bash deploy/tests/test-nginx-ratelimit.sh` (Docker)
+  - `bash deploy/tests/test-backup-restore.sh` (Docker)
 
 Documentação de planejamento (PRD, arquitetura, specs, tickets) vive em `_bmad-output/`.

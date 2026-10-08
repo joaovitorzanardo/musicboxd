@@ -12,7 +12,8 @@ mkdir -p "$TMP/bin" "$TMP/s3" "$TMP/work"
 printf 'DOMAIN=example.test\nGHCR_OWNER=someone\nIMAGE_TAG=latest\nBACKUP_BUCKET=test-bucket\nAWS_REGION=us-east-1\n' > "$TMP/stack.env"
 printf 'POSTGRES_DB=musicboxd\nPOSTGRES_USER=musicboxd\nPOSTGRES_PASSWORD=x\n' > "$TMP/postgres.env"
 cp "$HERE/fake-aws" "$TMP/bin/aws"
-command -v flock >/dev/null 2>&1 || printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/bin/flock"
+source "$HERE/lib.sh"
+stub_flock_if_missing
 chmod +x "$TMP/bin/"*
 
 export PATH="$TMP/bin:$PATH" FAKE_S3=$TMP/s3
@@ -33,11 +34,6 @@ dangling_volumes() { docker volume ls -q --filter dangling=true | sort; }
 VOLS_BEFORE=$(dangling_volumes)
 
 src_psql() { "${COMPOSE[@]}" exec -T postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'; }
-expect_rc() {  # expect_rc <code> <command...>; output lands in $TMP/out
-  local want=$1; shift
-  set +e; "$@" > "$TMP/out" 2>&1; local rc=$?; set -e
-  [ "$rc" = "$want" ] || { echo "expected rc=$want, got $rc:"; cat "$TMP/out"; exit 1; }
-}
 no_restore_container() { [ -z "$(docker ps -aq --filter "name=^${RESTORE_CONTAINER}\$")" ]; }
 
 "${COMPOSE[@]}" up -d postgres >/dev/null
