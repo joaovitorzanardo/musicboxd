@@ -16,12 +16,14 @@ grep -q 'ghcr.io/someone/musicboxd-web:latest' <<<"$OUT"
 # Only nginx publishes ports, and only 80/443.
 PUBLISHED=$(grep -E '^\s+published:' <<<"$OUT" | tr -d ' "' | sort | tr '\n' ' ')
 [ "$PUBLISHED" = "published:443 published:80 " ] || { echo "unexpected published ports: $PUBLISHED"; exit 1; }
-! grep -q 'POSTGRES_PASSWORD: musicboxd' <<<"$OUT"   # no hardcoded dev creds
+if grep -q 'POSTGRES_PASSWORD: musicboxd' <<<"$OUT"; then echo "hardcoded dev Postgres credentials in the prod stack"; exit 1; fi
 # MBD-17: the api reads its signing key and DB credentials from the host env files.
-grep -q 'MUSICBOXD_JWT_SECRET: prod-secret-from-api-env' <<<"$OUT" || { echo "api lacks MUSICBOXD_JWT_SECRET from api.env"; exit 1; }
-grep -q 'POSTGRES_PASSWORD: x' <<<"$OUT" || { echo "api lacks postgres.env credentials"; exit 1; }
-! grep -q 'bG9jYWwtZGV2' <<<"$OUT"   # the local-dev JWT secret never reaches prod
-grep -q 'condition: service_healthy' <<<"$OUT" || { echo "api does not wait for a healthy postgres"; exit 1; }
+# Assertions run on the api service block only (postgres also has credentials and a healthcheck).
+API=$(awk '/^  [A-Za-z0-9_-]+:/ { in_api = ($1 == "api:") } in_api' <<<"$(sed -n '/^services:/,/^networks:/p' <<<"$OUT")")
+grep -q 'MUSICBOXD_JWT_SECRET: prod-secret-from-api-env' <<<"$API" || { echo "api lacks MUSICBOXD_JWT_SECRET from api.env"; exit 1; }
+grep -q 'POSTGRES_PASSWORD: x' <<<"$API" || { echo "api lacks postgres.env credentials"; exit 1; }
+if grep -q 'bG9jYWwtZGV2' <<<"$OUT"; then echo "the local-dev JWT secret reached the prod stack"; exit 1; fi
+grep -q 'condition: service_healthy' <<<"$API" || { echo "api does not wait for a healthy postgres"; exit 1; }
 # Missing GHCR_OWNER / DOMAIN must fail fast with a clear message (not render empty values).
 if ERR=$(MUSICBOXD_ENV_DIR="$TMP" env -u GHCR_OWNER -u DOMAIN docker compose -f docker-compose.prod.yml config 2>&1 >/dev/null); then
   echo "compose config succeeded without GHCR_OWNER/DOMAIN"; exit 1

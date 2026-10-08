@@ -2,8 +2,12 @@
 
 ## Before merging MBD-17 (one time, on the EC2 host)
 
-The api now refuses to start without `MUSICBOXD_JWT_SECRET`. If `/etc/musicboxd/api.env` is missing,
-the deploy fails its health check and rolls back. Create it first (SSM session on the host):
+The api now refuses to start without `MUSICBOXD_JWT_SECRET`, and the prod compose file lists `/etc/musicboxd/api.env`
+as an env file. If that file is missing, `deploy.sh` copies the new compose file and then compose refuses to load the
+project ("env file ... not found") before any health check runs. The automatic rollback uses the same compose file, so it
+fails too ("Rollback to ... also failed"); the old containers keep running only because compose never touched them.
+`deploy/backup/backup-db.sh` and `restore-check.sh` load the same project, so nightly backups and the restore drill also
+fail until `api.env` exists. Create it first (SSM session on the host):
 
 ```bash
 sudo sh -c 'umask 077; printf "MUSICBOXD_JWT_SECRET=%s\n" "$(openssl rand -base64 32)" > /etc/musicboxd/api.env'
