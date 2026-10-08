@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.musicboxd.api.TestcontainersConfiguration;
+import com.musicboxd.api.accounts.Role;
 import com.musicboxd.api.accounts.TokenService;
 
 /** AD-7: public GETs need no token; writes need one; the contract documents the bearer scheme. */
@@ -44,7 +45,7 @@ class SecurityRulesTest {
 	void bearerTokensStillAuthenticateUnderTheAuthPrefix() throws Exception {
 		// Only the public auth endpoints ignore bearer headers; a future authenticated /api/v1/auth route
 		// (a password change) must still see a valid token. No such route exists, so 404.
-		String token = tokens.issue(UUID.randomUUID()).value();
+		String token = tokens.issue(UUID.randomUUID(), Role.USER).value();
 		mockMvc.perform(post("/api/v1/auth/not-a-route").header("Authorization", "Bearer " + token))
 			.andExpect(status().isNotFound());
 	}

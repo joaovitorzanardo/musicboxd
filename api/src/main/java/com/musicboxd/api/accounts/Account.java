@@ -3,7 +3,7 @@ package com.musicboxd.api.accounts;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-record Account(UUID id, String email, String passwordHash, OffsetDateTime emailVerifiedAt) {
+record Account(UUID id, String email, String passwordHash, OffsetDateTime emailVerifiedAt, Role role) {
 
 	boolean emailVerified() {
 		return emailVerifiedAt != null;
@@ -11,6 +11,7 @@ record Account(UUID id, String email, String passwordHash, OffsetDateTime emailV
 
 	@Override
 	public String toString() {
-		return "Account[id=" + id + ", email=" + email + ", passwordHash=***, emailVerified=" + emailVerified() + "]";
+		return "Account[id=" + id + ", email=" + email + ", passwordHash=***, emailVerified=" + emailVerified()
+				+ ", role=" + role + "]";
 	}
 }

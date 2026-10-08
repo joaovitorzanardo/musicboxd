@@ -24,6 +24,9 @@ public class JwtConfig {
 
 	public static final String ISSUER = "musicboxd";
 
+	/** Access-token claim holding the account's role, USER or STAFF (MBD-21). */
+	public static final String ROLE_CLAIM = "role";
+
 	@Bean
 	public JwtEncoder jwtEncoder(AuthProperties props) {
 		return new NimbusJwtEncoder(new ImmutableSecret<>(props.signingKey()));

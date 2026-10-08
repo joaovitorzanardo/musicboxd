@@ -143,7 +143,8 @@ public class AuthController {
 	}
 
 	private ResponseEntity<TokenResponse> withSession(UUID accountId, String refreshToken) {
-		var access = tokens.issue(accountId);
+		// The current role, from the database: a promotion or demotion shows up at the next login or refresh.
+		var access = tokens.issue(accountId, accounts.roleOf(accountId));
 		return ResponseEntity.ok()
 			.header(HttpHeaders.SET_COOKIE, RefreshCookies.issue(refreshToken, refreshProps.ttl()).toString())
 			.body(new TokenResponse(access.value(), "Bearer", access.expiresInSeconds()));

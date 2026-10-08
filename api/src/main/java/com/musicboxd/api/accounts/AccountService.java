@@ -41,7 +41,8 @@ public class AccountService {
 		if (tooLong(password)) {
 			throw new PasswordTooLongException();
 		}
-		var account = new Account(UUID.randomUUID(), normalize(email), passwordEncoder.encode(password), null);
+		var account = new Account(UUID.randomUUID(), normalize(email), passwordEncoder.encode(password), null,
+				Role.USER);
 		try {
 			accounts.insert(account);
 		}
@@ -80,6 +81,12 @@ public class AccountService {
 		var account = accounts.findById(accountId).orElseThrow(AccountNotFoundException::new);
 		String username = profiles.findUsername(accountId).orElseThrow(AccountNotFoundException::new);
 		return new AccountView(accountId, account.email(), username);
+	}
+
+	/** Read at every token issue (login and refresh), so a role change applies at the next access token (AD-8). */
+	@Transactional(readOnly = true)
+	public Role roleOf(UUID accountId) {
+		return accounts.findById(accountId).map(Account::role).orElseThrow(AccountNotFoundException::new);
 	}
 
 	static String normalize(String email) {

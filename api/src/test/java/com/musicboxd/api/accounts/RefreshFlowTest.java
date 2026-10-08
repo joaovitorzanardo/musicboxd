@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -35,6 +36,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.musicboxd.api.TestcontainersConfiguration;
 import com.musicboxd.api.mail.MailTestConfiguration;
 import com.musicboxd.api.mail.RecordingMailSender;
+import com.musicboxd.api.security.JwtConfig;
 
 import jakarta.servlet.http.Cookie;
 
@@ -54,6 +56,9 @@ class RefreshFlowTest {
 
 	@Autowired
 	private JdbcClient jdbc;
+
+	@Autowired
+	private JwtDecoder jwtDecoder;
 
 	@Test
 	void loginSetsAHardenedRefreshCookie() throws Exception {
@@ -164,6 +169,20 @@ class RefreshFlowTest {
 	}
 
 	@Test
+	void accessTokensCarryTheRoleAndARoleChangeTakesEffectAtTheNextRefresh() throws Exception {
+		String email = verifiedAccount();
+		MvcResult first = login(email).andExpect(status().isOk()).andReturn();
+		assertThat(roleClaim(first)).isEqualTo("USER");
+
+		// AD-8: no API promotes anyone; Staff is assigned in the database (MBD-21 bootstrap or by hand).
+		jdbc.sql("UPDATE accounts.accounts SET role = 'STAFF' WHERE lower(email) = lower(:email)")
+			.param("email", email).update();
+
+		MvcResult refreshed = refresh(refreshCookie(first)).andExpect(status().isOk()).andReturn();
+		assertThat(roleClaim(refreshed)).isEqualTo("STAFF");
+	}
+
+	@Test
 	void logoutNeedsNoAccessTokenAndIgnoresAStaleOne() throws Exception {
 		String token = refreshCookie(login(verifiedAccount()).andReturn());
 
@@ -212,6 +231,11 @@ class RefreshFlowTest {
 
 	private static MockHttpServletRequestBuilder withCookie(MockHttpServletRequestBuilder request, String value) {
 		return request.cookie(new Cookie(RefreshCookies.NAME, value));
+	}
+
+	private String roleClaim(MvcResult result) throws Exception {
+		String token = JsonPath.read(result.getResponse().getContentAsString(), "$.accessToken");
+		return jwtDecoder.decode(token).getClaimAsString(JwtConfig.ROLE_CLAIM);
 	}
 
 	private static String refreshCookie(MvcResult result) {
