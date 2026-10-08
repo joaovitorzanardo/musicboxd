@@ -18,7 +18,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import com.musicboxd.api.TestcontainersConfiguration;
 import com.musicboxd.api.db.ModuleFlyway;
 
-/** MBD-21: the first STAFF account comes from MUSICBOXD_BOOTSTRAP_STAFF_EMAIL through a repeatable migration. */
+/** MBD-21: the first STAFF account comes from MUSICBOXD_BOOTSTRAP_STAFF_EMAIL through an afterMigrate callback. */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class StaffBootstrapTest {
@@ -30,7 +30,7 @@ class StaffBootstrapTest {
 	private JdbcClient jdbc;
 
 	@Test
-	void theConfiguredEmailIsPromotedCaseInsensitively() throws InterruptedException {
+	void theConfiguredEmailIsPromotedCaseInsensitively() {
 		String email = uniqueEmail();
 		UUID id = insertAccount(email);
 		UUID bystander = insertAccount(uniqueEmail());
@@ -42,7 +42,7 @@ class StaffBootstrapTest {
 	}
 
 	@Test
-	void promotionRerunsOnEveryMigrate() throws InterruptedException {
+	void promotionRerunsOnEveryMigrate() {
 		// First deploy: the variable is set before the person registered, so nobody matches.
 		String email = uniqueEmail();
 		migrateWith(email);
@@ -55,7 +55,7 @@ class StaffBootstrapTest {
 	}
 
 	@Test
-	void anEmptyVariablePromotesNobodyAndNothingDemotes() throws InterruptedException {
+	void anEmptyVariablePromotesNobodyAndNothingDemotes() {
 		String email = uniqueEmail();
 		UUID id = insertAccount(email);
 		migrateWith(email);
@@ -68,12 +68,37 @@ class StaffBootstrapTest {
 	}
 
 	@Test
+	void anUnverifiedAccountIsNotPromoted() {
+		String email = uniqueEmail();
+		UUID id = UUID.randomUUID();
+		jdbc.sql("INSERT INTO accounts.accounts (id, email, password_hash) VALUES (:id, :email, '{noop}x')")
+			.param("id", id).param("email", email).update();
+
+		migrateWith(email);
+
+		assertThat(role(id)).isEqualTo("USER");
+	}
+
+	@Test
+	void promotionLeavesNoSchemaHistoryRow() {
+		String email = uniqueEmail();
+		insertAccount(email);
+		Integer before = historyRows();
+
+		migrateWith(email);
+
+		assertThat(historyRows()).isEqualTo(before);
+		assertThat(jdbc.sql("SELECT count(*) FROM accounts.flyway_schema_history WHERE script LIKE '%promote_bootstrap_staff%'")
+			.query(Integer.class).single()).isZero();
+	}
+
+	@Test
 	void bootstrapEmailIsValidated() {
 		assertThat(AccountsConfig.bootstrapStaffEmail(null)).isEmpty();
 		assertThat(AccountsConfig.bootstrapStaffEmail("   ")).isEmpty();
 		assertThat(AccountsConfig.bootstrapStaffEmail("  Staff@Example.COM ")).isEqualTo("staff@example.com");
 		for (String bad : new String[] { "o'brien@example.com", "x' OR '1'='1", "no-at-sign", "a b@example.com",
-				"@example.com", "staff@" }) {
+				"@example.com", "staff@", "a@b@c" }) {
 			assertThatThrownBy(() -> AccountsConfig.bootstrapStaffEmail(bad))
 				.as(bad)
 				.isInstanceOf(IllegalStateException.class)
@@ -81,30 +106,25 @@ class StaffBootstrapTest {
 		}
 	}
 
-	private void migrateWith(String email) throws InterruptedException {
-		awaitNextSecond();
+	private void migrateWith(String email) {
 		ModuleFlyway.forSchema(dataSource, "accounts",
 				Map.of(AccountsConfig.STAFF_EMAIL_PLACEHOLDER, AccountsConfig.bootstrapStaffEmail(email)))
 			.migrate();
 	}
 
-	/** ${flyway:timestamp} has one-second resolution; real restarts are always further apart than that. */
-	private static void awaitNextSecond() throws InterruptedException {
-		long second = System.currentTimeMillis() / 1000;
-		while (System.currentTimeMillis() / 1000 == second) {
-			Thread.sleep(20);
-		}
-	}
-
 	private UUID insertAccount(String email) {
 		UUID id = UUID.randomUUID();
-		jdbc.sql("INSERT INTO accounts.accounts (id, email, password_hash) VALUES (:id, :email, '{noop}x')")
+		jdbc.sql("INSERT INTO accounts.accounts (id, email, password_hash, email_verified_at) VALUES (:id, :email, '{noop}x', now())")
 			.param("id", id).param("email", email).update();
 		return id;
 	}
 
 	private String role(UUID id) {
 		return jdbc.sql("SELECT role FROM accounts.accounts WHERE id = :id").param("id", id).query(String.class).single();
+	}
+
+	private Integer historyRows() {
+		return jdbc.sql("SELECT count(*) FROM accounts.flyway_schema_history").query(Integer.class).single();
 	}
 
 	private Integer staffCount() {

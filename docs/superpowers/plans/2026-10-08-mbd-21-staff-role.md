@@ -14,6 +14,8 @@
 
 ## Decisions (defaults chosen for this story)
 
+> **2026-10-08, after the final review:** the bootstrap was changed from the `R__` repeatable migration to an `afterMigrate__promote_bootstrap_staff.sql` callback (verified accounts only). The repeatable migration wrote a `flyway_schema_history` row, so any pre-MBD-21 image failed validation and rollbacks broke; a callback records nothing. Mentions of `R__` and `${flyway:timestamp}` below describe the original design.
+
 | Question | Decision |
 |---|---|
 | Where the role lives | `accounts.accounts.role text NOT NULL DEFAULT 'USER'`, `CHECK (role IN ('USER','STAFF'))`. One role per account; STAFF implies everything a USER can do. |

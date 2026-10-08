@@ -46,7 +46,7 @@ musicboxd:
     refresh-token:
       ttl: 30d
       grace: 10s
-  # MBD-21: promotes this account to STAFF on every start (R__promote_bootstrap_staff.sql). Optional;
+  # MBD-21: promotes this account to STAFF on every start (afterMigrate callback). Optional;
   # the account must already exist (runbook-mbd-21-staff-bootstrap.md). Removing it does not demote.
   bootstrap-staff-email: ${MUSICBOXD_BOOTSTRAP_STAFF_EMAIL:}
   verification:
