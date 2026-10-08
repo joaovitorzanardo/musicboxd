@@ -5,6 +5,7 @@ import static com.musicboxd.api.accounts.AccountServiceTest.uniqueUsername;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -37,7 +38,7 @@ import com.musicboxd.api.mail.RecordingMailSender;
 
 import jakarta.servlet.http.Cookie;
 
-/** MBD-19 acceptance, over HTTP: login sets the cookie, refresh rotates it, replay is rejected. */
+/** MBD-19/MBD-20 acceptance, over HTTP: login sets the cookie, refresh rotates it, replay is rejected, logout revokes it. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({ TestcontainersConfiguration.class, MailTestConfiguration.class })
@@ -129,6 +130,62 @@ class RefreshFlowTest {
 			.andExpect(status().isOk());
 	}
 
+	@Test
+	void logoutRevokesTheTokenServerSideNotJustTheCookie() throws Exception {
+		String token = refreshCookie(login(verifiedAccount()).andReturn());
+
+		logout(token)
+			.andExpect(status().isNoContent())
+			.andExpect(content().string(""))
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, allOf(
+					containsString(RefreshCookies.NAME + "=;"),
+					containsString("Max-Age=0"),
+					containsString("Path=/api/v1/auth/refresh"))));
+
+		// The client ignores the cleared cookie and replays the old value by hand: the server must refuse it.
+		refresh(token)
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.type").value(InvalidRefreshTokenException.TYPE.toString()));
+		Boolean revokedBeforeExpiry = jdbc.sql("""
+				SELECT f.revoked_at IS NOT NULL AND t.expires_at > now() FROM accounts.refresh_tokens t
+				JOIN accounts.refresh_token_families f ON f.id = t.family_id WHERE t.token_hash = :hash""")
+			.param("hash", OpaqueTokens.hash(token)).query(Boolean.class).single();
+		assertThat(revokedBeforeExpiry).isTrue();
+	}
+
+	@Test
+	void aFreshLoginStillWorksAfterLogout() throws Exception {
+		String email = verifiedAccount();
+		logout(refreshCookie(login(email).andReturn())).andExpect(status().isNoContent());
+
+		String fresh = refreshCookie(login(email).andExpect(status().isOk()).andReturn());
+
+		refresh(fresh).andExpect(status().isOk());
+	}
+
+	@Test
+	void logoutNeedsNoAccessTokenAndIgnoresAStaleOne() throws Exception {
+		String token = refreshCookie(login(verifiedAccount()).andReturn());
+
+		mockMvc.perform(withCookie(delete("/api/v1/auth/refresh"), token).header("Authorization", "Bearer not-a-jwt"))
+			.andExpect(status().isNoContent());
+		refresh(token).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void logoutWithoutAValidCookieIsStill204() throws Exception {
+		mockMvc.perform(delete("/api/v1/auth/refresh"))
+			.andExpect(status().isNoContent())
+			.andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+		logout("").andExpect(status().isNoContent());
+		logout("not-a-real-token").andExpect(status().isNoContent());
+		logout("x".repeat(4_000)).andExpect(status().isNoContent());
+
+		String token = refreshCookie(login(verifiedAccount()).andReturn());
+		logout(token).andExpect(status().isNoContent());
+		logout(token).andExpect(status().isNoContent()); // double click
+	}
+
 	private String verifiedAccount() throws Exception {
 		String email = uniqueEmail();
 		mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
@@ -147,6 +204,10 @@ class RefreshFlowTest {
 
 	private ResultActions refresh(String cookieValue) throws Exception {
 		return mockMvc.perform(withCookie(post("/api/v1/auth/refresh"), cookieValue));
+	}
+
+	private ResultActions logout(String cookieValue) throws Exception {
+		return mockMvc.perform(withCookie(delete("/api/v1/auth/refresh"), cookieValue));
 	}
 
 	private static MockHttpServletRequestBuilder withCookie(MockHttpServletRequestBuilder request, String value) {

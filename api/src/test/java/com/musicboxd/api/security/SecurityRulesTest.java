@@ -43,7 +43,7 @@ class SecurityRulesTest {
 	@Test
 	void bearerTokensStillAuthenticateUnderTheAuthPrefix() throws Exception {
 		// Only the public auth endpoints ignore bearer headers; a future authenticated /api/v1/auth route
-		// (MBD-20's logout, a password change) must still see a valid token. No such route exists, so 404.
+		// (a password change) must still see a valid token. No such route exists, so 404.
 		String token = tokens.issue(UUID.randomUUID()).value();
 		mockMvc.perform(post("/api/v1/auth/not-a-route").header("Authorization", "Bearer " + token))
 			.andExpect(status().isNotFound());
@@ -59,6 +59,7 @@ class SecurityRulesTest {
 			.andExpect(jsonPath("$.paths['/api/v1/auth/verification-email'].post.responses['202']").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].post.responses['200']").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].post.responses['401']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].delete.responses['204']").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/accounts/me'].get.security[0].bearer").exists())
 			.andExpect(jsonPath("$.components.securitySchemes.bearer.scheme").value("bearer"));
 	}

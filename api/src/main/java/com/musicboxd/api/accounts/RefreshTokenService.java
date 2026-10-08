@@ -9,7 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Opaque refresh tokens (MBD-19, AD-8): hashed at rest, rotated on every use, reuse revokes the login's family. */
+/**
+ * Opaque refresh tokens (MBD-19, AD-8): hashed at rest, rotated on every use, reuse revokes the login's family.
+ * Logout revokes it too (MBD-20).
+ */
 @Service
 class RefreshTokenService {
 
@@ -57,6 +60,21 @@ class RefreshTokenService {
 		}
 		// Otherwise a parallel tab or a retried lost response, inside the grace window: it gets a sibling.
 		return new Rotation(token.accountId(), insertSuccessor(token.familyId(), token.accountId(), now));
+	}
+
+	/**
+	 * Logout (MBD-20): revokes the token's whole family, so grace-window siblings and a successor that a
+	 * parallel refresh is issuing right now die with it. Same lock order as {@link #rotate}. Unknown, expired
+	 * and already-revoked tokens are a no-op: logout always succeeds and reveals nothing.
+	 */
+	@Transactional
+	public void revoke(String rawToken) {
+		tokens.findForUpdate(OpaqueTokens.hash(rawToken)).ifPresent(token -> {
+			if (!tokens.lockFamilyAndCheckRevoked(token.familyId())) {
+				tokens.revokeFamily(token.familyId(), clock.instant());
+				log.info("Logout for account {}: revoked family {}", token.accountId(), token.familyId());
+			}
+		});
 	}
 
 	private String insertSuccessor(UUID familyId, UUID accountId, Instant now) {
