@@ -29,6 +29,11 @@ public record AuthProperties(String jwtSecret, @DefaultValue("15m") Duration acc
 		}
 	}
 
+	@Override
+	public String toString() {
+		return "AuthProperties[jwtSecret=***, accessTokenTtl=" + accessTokenTtl + "]";
+	}
+
 	public SecretKey signingKey() {
 		return new SecretKeySpec(decode(jwtSecret), "HmacSHA256");
 	}

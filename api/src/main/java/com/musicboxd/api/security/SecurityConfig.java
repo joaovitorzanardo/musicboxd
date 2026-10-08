@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 
 import jakarta.servlet.DispatcherType;
@@ -22,6 +23,7 @@ public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+		AuthenticationEntryPoint entryPoint = new ProblemDetailsAuthenticationEntryPoint();
 		http
 			// Stateless bearer tokens, no cookie-borne credentials: CSRF does not apply.
 			// MBD-19's refresh cookie (SameSite=Lax, path-scoped) must revisit this.
@@ -32,9 +34,11 @@ public class SecurityConfig {
 				.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/v1/accounts/me").authenticated()
+				// GUARD: any authenticated GET must be listed ABOVE this line, or it becomes public.
 				.requestMatchers(HttpMethod.GET, "/api/**").permitAll()
 				.anyRequest().authenticated())
-			.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
+			.exceptionHandling(e -> e.authenticationEntryPoint(entryPoint))
+			.oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()).authenticationEntryPoint(entryPoint));
 		return http.build();
 	}
 }

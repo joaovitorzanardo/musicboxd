@@ -202,7 +202,7 @@ Swapping the domain later, and any SPA/CORS origin change, is not part of this t
 | ---------------------------- | ------------------------------------------------------ |
 | Domain (`DOMAIN`)            | `musicboxd.com.br` (apex, A record to the Elastic IP, no AAAA; `www` is not served or covered by the cert) |
 | Stack directory on the host  | `/opt/musicboxd` (copy of the repo's `deploy/`)         |
-| Env files (root, mode 600)   | `/etc/musicboxd/stack.env`, `/etc/musicboxd/postgres.env` |
+| Env files (root, mode 600)   | `/etc/musicboxd/stack.env`, `/etc/musicboxd/postgres.env`, `/etc/musicboxd/api.env` |
 | Images                       | `ghcr.io/joaovitorzanardo/musicboxd-api`, `musicboxd-web` (`IMAGE_TAG`, default `latest`) |
 | Compose project / volumes    | project `musicboxd`; volumes `postgres_data`, `letsencrypt`, `certbot_www` |
 | Certificate renewal          | `musicboxd-certbot-renew.timer`, twice daily, reloads nginx only after a renewal |
@@ -237,15 +237,17 @@ sudo install -d -m 700 /etc/musicboxd
 
 If the repo is private, clone with a read-only deploy key or token and do not leave it on disk.
 
-Create the two env files from `deploy/prod.env.example` (drop the inline `#` comments), then lock them down:
+Create the three env files from `deploy/prod.env.example` (drop the inline `#` comments), then lock them down:
 
 ```bash
 sudoedit /etc/musicboxd/stack.env       # DOMAIN, GHCR_OWNER (lowercase), IMAGE_TAG, CERTBOT_EMAIL
 sudoedit /etc/musicboxd/postgres.env    # POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+sudoedit /etc/musicboxd/api.env         # MUSICBOXD_JWT_SECRET
 sudo chmod 600 /etc/musicboxd/*.env
 ```
 
-Generate the Postgres password with `openssl rand -base64 24`. Secrets stay on the host and never go in the repo.
+Generate the Postgres password with `openssl rand -base64 24` and the JWT signing secret with
+`openssl rand -base64 32` (the api refuses to start without `MUSICBOXD_JWT_SECRET`). Secrets stay on the host and never go in the repo.
 
 ### 2. Log in to GHCR (only if the packages are private)
 

@@ -27,9 +27,18 @@ public class AuthController {
 			@NotNull @Size(min = 8, message = "must be at least 8 characters") String password,
 			@NotNull @Pattern(regexp = "[A-Za-z0-9_]{3,20}",
 					message = "must be 3-20 letters, digits or underscores") String username) {
+
+		/** Validation sees the stripped email, matching what the service stores. */
+		public RegisterRequest {
+			email = email == null ? null : email.strip();
+		}
 	}
 
 	public record LoginRequest(@NotBlank String email, @NotBlank String password) {
+
+		public LoginRequest {
+			email = email == null ? null : email.strip();
+		}
 	}
 
 	public record TokenResponse(String accessToken, String tokenType, long expiresIn) {

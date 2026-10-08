@@ -5,6 +5,8 @@ import static com.musicboxd.api.accounts.AccountServiceTest.uniqueUsername;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -75,6 +77,15 @@ class AuthFlowTest {
 	}
 
 	@Test
+	void emailWithSurroundingWhitespaceRegistersLowercasedOverHttp() throws Exception {
+		String email = uniqueEmail();
+		register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername())
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.email").value(email));
+		login(email, PASSWORD).andExpect(status().isOk());
+	}
+
+	@Test
 	void usernameIsReadFromTheProfilesSchema() throws Exception {
 		String username = uniqueUsername();
 		String body = register(uniqueEmail(), PASSWORD, username)
@@ -104,9 +115,16 @@ class AuthFlowTest {
 
 	@Test
 	void protectedEndpointRejectsMissingMalformedAndExpiredTokens() throws Exception {
-		mockMvc.perform(get("/api/v1/accounts/me")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/v1/accounts/me"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(header().exists("WWW-Authenticate"))
+			.andExpect(jsonPath("$.status").value(401))
+			.andExpect(jsonPath("$.title").value("Unauthorized"));
 		mockMvc.perform(get("/api/v1/accounts/me").header("Authorization", "Bearer not-a-jwt"))
-			.andExpect(status().isUnauthorized());
+			.andExpect(status().isUnauthorized())
+			.andExpect(header().exists("WWW-Authenticate"))
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.status").value(401));
 
 		var expired = new TokenService(jwtEncoder, authProperties,
 				Clock.fixed(Instant.now().minus(Duration.ofHours(1)), ZoneOffset.UTC))

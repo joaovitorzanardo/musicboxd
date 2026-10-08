@@ -39,4 +39,10 @@ class AuthPropertiesTest {
 		String secret = Base64.getEncoder().encodeToString(new byte[32]);
 		assertThat(new AuthProperties(secret, TTL).signingKey().getAlgorithm()).isEqualTo("HmacSHA256");
 	}
+
+	@Test
+	void toStringDoesNotLeakTheSecret() {
+		String secret = Base64.getEncoder().encodeToString(new byte[32]);
+		assertThat(new AuthProperties(secret, TTL).toString()).doesNotContain(secret).contains("***");
+	}
 }

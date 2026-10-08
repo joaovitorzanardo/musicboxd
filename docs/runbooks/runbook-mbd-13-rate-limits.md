@@ -25,8 +25,8 @@ Values: domain `musicboxd.com.br`, stack at `/opt/musicboxd`, env file `/etc/mus
 
 Keep the two nginx files in sync; `deploy/tests/test-nginx-conf.sh` checks the prod template has the directives.
 A Spring policy can be overridden on the host without a rebuild: add a line such as
-`MUSICBOXD_RATELIMIT_POLICIES_DEMO_CAPACITY=10` (relaxed binding) to `/etc/musicboxd/postgres.env`, which is the env
-file the `api` service reads (it shares it with `postgres`), then recreate the api container. **[host]**
+`MUSICBOXD_RATELIMIT_POLICIES_DEMO_CAPACITY=10` (relaxed binding) to `/etc/musicboxd/api.env` (the `api` service reads
+`postgres.env`, shared with `postgres`, and `api.env`; api-only settings go in `api.env`), then recreate the api container. **[host]**
 `cd /opt/musicboxd && sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d api`
 
 Applying a limit to a new endpoint (later epics): add `@RateLimited(policy = "<name>")` to the controller method and
