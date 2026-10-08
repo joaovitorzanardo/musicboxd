@@ -6,6 +6,11 @@ server:
 spring:
   application:
     name: musicboxd-api
+  cloud:
+    aws:
+      # The SES identity lives in us-east-1 (runbook-mbd-18). Static, so startup never asks IMDS for a region.
+      region:
+        static: us-east-1
   datasource:
     # Compose hands the api the same postgres.env the database reads (AD-11: secrets in env files on the host).
     url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:musicboxd}
@@ -28,8 +33,17 @@ musicboxd:
       demo:
         capacity: 5
         refill-period: 1m
+      # MBD-18 resend: unauthenticated, so keyed per client IP. MBD-23 adds per-email limits.
+      verification-email:
+        capacity: 3
+        refill-period: 15m
   auth:
     # Base64 of >= 32 random bytes (openssl rand -base64 32), from /etc/musicboxd/api.env.
     # No default on purpose: the api refuses to start without it.
     jwt-secret: ${MUSICBOXD_JWT_SECRET:}
     access-token-ttl: 15m
+  verification:
+    # No defaults: the api refuses to start without them (/etc/musicboxd/api.env, runbook-mbd-18).
+    link-base-url: ${MUSICBOXD_PUBLIC_BASE_URL:}
+    mail-from: ${MUSICBOXD_MAIL_FROM:}
+    ttl: 24h

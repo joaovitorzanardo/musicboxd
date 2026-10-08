@@ -7,6 +7,8 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 printf 'DOMAIN=example.test\nGHCR_OWNER=someone\nIMAGE_TAG=latest\nCERTBOT_EMAIL=a@b.c\n' > "$TMP/stack.env"
 printf 'POSTGRES_DB=musicboxd\nPOSTGRES_USER=musicboxd\nPOSTGRES_PASSWORD=x\n' > "$TMP/postgres.env"
 printf 'MUSICBOXD_JWT_SECRET=prod-secret-from-api-env
+MUSICBOXD_MAIL_FROM=no-reply@example.test
+MUSICBOXD_PUBLIC_BASE_URL=https://example.test
 ' > "$TMP/api.env"
 
 OUT=$(MUSICBOXD_ENV_DIR="$TMP" docker compose --env-file "$TMP/stack.env" -f docker-compose.prod.yml config)
@@ -21,6 +23,11 @@ if grep -q 'POSTGRES_PASSWORD: musicboxd' <<<"$OUT"; then echo "hardcoded dev Po
 # Assertions run on the api service block only (postgres also has credentials and a healthcheck).
 API=$(awk '/^  [A-Za-z0-9_-]+:/ { in_api = ($1 == "api:") } in_api' <<<"$(sed -n '/^services:/,/^networks:/p' <<<"$OUT")")
 grep -q 'MUSICBOXD_JWT_SECRET: prod-secret-from-api-env' <<<"$API" || { echo "api lacks MUSICBOXD_JWT_SECRET from api.env"; exit 1; }
+# MBD-18: production sends through SES (library default); the dev compose's "log instead" switch must not leak in.
+grep -q 'MUSICBOXD_MAIL_FROM: no-reply@example.test' <<<"$API" || { echo "api lacks MUSICBOXD_MAIL_FROM from api.env"; exit 1; }
+grep -q 'MUSICBOXD_PUBLIC_BASE_URL: https://example.test' <<<"$API" || { echo "api lacks MUSICBOXD_PUBLIC_BASE_URL"; exit 1; }
+if grep -q 'SPRING_CLOUD_AWS_SES_ENABLED' <<<"$OUT"; then echo "the prod stack overrides SES enablement"; exit 1; fi
+if grep -qi 'AWS_SECRET_ACCESS_KEY\|AWS_ACCESS_KEY_ID' <<<"$OUT"; then echo "static AWS keys in the prod stack (AD-11)"; exit 1; fi
 grep -q 'POSTGRES_PASSWORD: x' <<<"$API" || { echo "api lacks postgres.env credentials"; exit 1; }
 if grep -q 'bG9jYWwtZGV2' <<<"$OUT"; then echo "the local-dev JWT secret reached the prod stack"; exit 1; fi
 grep -q 'condition: service_healthy' <<<"$API" || { echo "api does not wait for a healthy postgres"; exit 1; }

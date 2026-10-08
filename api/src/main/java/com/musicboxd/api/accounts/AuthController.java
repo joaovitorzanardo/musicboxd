@@ -3,11 +3,15 @@ package com.musicboxd.api.accounts;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.musicboxd.api.ratelimit.RateLimited;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -44,12 +48,24 @@ public class AuthController {
 	public record TokenResponse(String accessToken, String tokenType, long expiresIn) {
 	}
 
+	public record ResendVerificationRequest(@NotBlank @Size(max = 254) String email) {
+
+		public ResendVerificationRequest {
+			email = email == null ? null : email.strip();
+		}
+	}
+
+	public record VerificationResponse(String status) {
+	}
+
 	private final AccountService accounts;
 	private final TokenService tokens;
+	private final EmailVerificationService verifications;
 
-	AuthController(AccountService accounts, TokenService tokens) {
+	AuthController(AccountService accounts, TokenService tokens, EmailVerificationService verifications) {
 		this.accounts = accounts;
 		this.tokens = tokens;
+		this.verifications = verifications;
 	}
 
 	@PostMapping("/register")
@@ -64,9 +80,30 @@ public class AuthController {
 	@PostMapping("/login")
 	@ApiResponse(responseCode = "200", description = "A short-lived bearer access token")
 	@ApiResponse(responseCode = "401", description = "Unknown email or wrong password (indistinguishable)")
+	@ApiResponse(responseCode = "403",
+			description = "Right password, email not verified yet (type urn:musicboxd:problem:email-not-verified)")
 	public TokenResponse login(@Valid @RequestBody LoginRequest request) {
 		UUID accountId = accounts.authenticate(request.email(), request.password());
 		var token = tokens.issue(accountId);
 		return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds());
+	}
+
+	/** The emailed link points here. MBD-22 may move the link to an SPA page that calls this same endpoint. */
+	@GetMapping("/verify")
+	@ApiResponse(responseCode = "200", description = "Email verified (also when the link was already used)")
+	@ApiResponse(responseCode = "400", description = "Missing, unknown, replaced or expired token")
+	public VerificationResponse verify(@RequestParam @NotBlank @Size(max = 128) String token) {
+		verifications.verify(token);
+		return new VerificationResponse("verified");
+	}
+
+	@PostMapping("/verification-email")
+	@ResponseStatus(HttpStatus.ACCEPTED)
+	@RateLimited(policy = "verification-email")
+	@ApiResponse(responseCode = "202", description = "If an unverified account has this email, a new link was sent")
+	@ApiResponse(responseCode = "400", description = "Invalid email")
+	@ApiResponse(responseCode = "429", description = "Too many requests from this caller; see Retry-After")
+	public void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+		verifications.resend(request.email());
 	}
 }

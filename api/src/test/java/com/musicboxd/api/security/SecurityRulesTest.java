@@ -39,6 +39,9 @@ class SecurityRulesTest {
 		mockMvc.perform(get("/api/v1/api-docs"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/register'].post").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.responses['401']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.responses['403']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/verify'].get.responses['200']").exists())
+			.andExpect(jsonPath("$.paths['/api/v1/auth/verification-email'].post.responses['202']").exists())
 			.andExpect(jsonPath("$.paths['/api/v1/accounts/me'].get.security[0].bearer").exists())
 			.andExpect(jsonPath("$.components.securitySchemes.bearer.scheme").value("bearer"));
 	}

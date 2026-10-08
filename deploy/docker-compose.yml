@@ -10,6 +10,10 @@ services:
       # Local-dev-only signing key (Base64 of a fixed 40-byte string); production reads
       # MUSICBOXD_JWT_SECRET from /etc/musicboxd/api.env (runbook-mbd-17-auth.md).
       MUSICBOXD_JWT_SECRET: bG9jYWwtZGV2LWp3dC1zZWNyZXQtbmV2ZXItdXNlLWluLXByb2QhIQ==
+      # Local dev: verification emails are logged, not sent (docker compose logs api).
+      SPRING_CLOUD_AWS_SES_ENABLED: "false"
+      MUSICBOXD_MAIL_FROM: no-reply@localhost
+      MUSICBOXD_PUBLIC_BASE_URL: http://localhost
     depends_on:
       postgres:
         condition: service_healthy

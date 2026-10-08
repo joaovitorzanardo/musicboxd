@@ -32,7 +32,9 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> auth
 				// Error dispatches carry the original status; don't turn them into 401s.
 				.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login",
+						"/api/v1/auth/verification-email").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/v1/auth/verify").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/v1/accounts/me").authenticated()
 				// GUARD: any authenticated GET must be listed ABOVE this line, or it becomes public.
 				.requestMatchers(HttpMethod.GET, "/api/**").permitAll()
