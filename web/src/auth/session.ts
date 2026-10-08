@@ -29,14 +29,29 @@ export function isAccessTokenExpired(): boolean {
   return session !== null && Date.now() >= session.expiresAt;
 }
 
-/** Counts the lifetime from now (when the response arrived), so the client clock's skew does not matter. */
-export function startSession(token: TokenResponse): void {
+/**
+ * Counts the lifetime from now (when the response arrived), so the client clock's skew does not matter.
+ * Returns false (and changes nothing) when `expiresIn` is not a finite number above zero.
+ */
+export function startSession(token: TokenResponse): boolean {
+  if (!Number.isFinite(token.expiresIn) || token.expiresIn <= 0) {
+    return false;
+  }
   const lifetimeMs = token.expiresIn * 1000;
   session = { accessToken: token.accessToken, expiresAt: Date.now() + lifetimeMs };
   clearTimeout(timer);
+  // Floored at half the lifetime so a short-lived token cannot make the refresh loop.
   timer = setTimeout(() => {
     void refreshSession();
-  }, Math.max(0, lifetimeMs - REFRESH_LEAD_MS));
+  }, Math.max(lifetimeMs / 2, lifetimeMs - REFRESH_LEAD_MS));
+  return true;
+}
+
+/** A login: supersedes any refresh still in flight, so a stale answer cannot overwrite or end this session. */
+export function beginSession(token: TokenResponse): boolean {
+  generation += 1;
+  inFlight = null;
+  return startSession(token);
 }
 
 export function endSession(): void {
@@ -98,8 +113,7 @@ async function requestRefresh(started: number): Promise<RefreshOutcome> {
     if (started !== generation) {
       return 'signed-out';
     }
-    startSession(token);
-    return 'refreshed';
+    return startSession(token) ? 'refreshed' : 'unavailable';
   } catch {
     return 'unavailable';
   }

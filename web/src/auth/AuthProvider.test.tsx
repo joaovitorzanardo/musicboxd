@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router';
 import { apiFetch } from './apiFetch';
+import { accessToken } from './session';
 import { fakeApi, json, problem, tokenResponse } from '../test/fakeApi';
 import { LocationProbe, renderApp } from '../test/renderApp';
 
@@ -30,6 +31,19 @@ describe('AuthProvider', () => {
     renderApp('/');
 
     expect(await screen.findByText(/Conectado como @ana/)).toBeInTheDocument();
+  });
+
+  it('keeps the token when /me fails on the network after a good refresh', async () => {
+    fakeApi({
+      'POST /api/v1/auth/refresh': () => tokenResponse('a1'),
+      'GET /api/v1/accounts/me': () => Promise.reject(new TypeError('Failed to fetch')),
+      'GET /api/v1/health': health,
+    });
+
+    renderApp('/');
+
+    expect(await screen.findByRole('link', { name: 'Entrar' })).toBeInTheDocument();
+    expect(accessToken()).toBe('a1');
   });
 
   it('is a Guest after a hard refresh without a working refresh cookie', async () => {

@@ -151,4 +151,33 @@ describe('apiFetch', () => {
 
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it('refreshes only once when the pre-send refresh already failed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    startSession(token('a1', 900));
+    vi.setSystemTime(Date.now() + 901_000);
+    const { calls } = fakeApi({
+      'POST /api/v1/auth/refresh': () => Promise.reject(new TypeError('Failed to fetch')),
+      'GET /api/v1/accounts/me': () => problem(401),
+    });
+
+    await apiFetch('/api/v1/accounts/me');
+
+    expect(calls.filter((c) => c.url === '/api/v1/auth/refresh')).toHaveLength(1);
+  });
+
+  it('does not run the auth-required handler for a signed-in write still refused after a refresh', async () => {
+    const handler = vi.fn();
+    setAuthRequiredHandler(handler);
+    startSession(token('a1'));
+    fakeApi({
+      'POST /api/v1/ratings': () => problem(401),
+      'POST /api/v1/auth/refresh': () => tokenResponse('a2'),
+    });
+
+    const response = await apiFetch('/api/v1/ratings', { method: 'POST', body: '{}' });
+
+    expect(response.status).toBe(401);
+    expect(handler).not.toHaveBeenCalled();
+  });
 });

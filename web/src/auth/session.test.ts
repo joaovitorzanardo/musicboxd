@@ -5,6 +5,7 @@ import {
   endSession,
   isAccessTokenExpired,
   onSessionEnd,
+  beginSession,
   refreshSession,
   startSession,
 } from './session';
@@ -104,5 +105,51 @@ describe('session', () => {
     await stale;
 
     expect(accessToken()).toBe('a3');
+  });
+
+  it('treats a 200 without a usable expiresIn as unavailable and keeps the session', async () => {
+    startSession(token('a1'));
+    for (const body of [{ accessToken: 'bad' }, { accessToken: 'bad', expiresIn: 0 }, { accessToken: 'bad', expiresIn: -5 }]) {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      );
+      expect(await refreshSession()).toBe('unavailable');
+    }
+    expect(accessToken()).toBe('a1');
+  });
+
+  it('does not start a session from a token with an invalid expiresIn', () => {
+    startSession({ accessToken: 'bad', tokenType: 'Bearer', expiresIn: Number.NaN });
+    expect(accessToken()).toBeNull();
+  });
+
+  it('floors the proactive refresh at half the lifetime for short-lived tokens', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue(ok('a2'));
+    startSession(token('a1', 60));
+
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(fetch).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['401', () => new Response(null, { status: 401 })],
+    ['200', () => ok('stale')],
+  ])('a login supersedes a refresh still in flight (stale %s)', async (_name, stale) => {
+    const ended = vi.fn();
+    onSessionEnd(ended);
+    let respond!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise((resolve) => (respond = resolve)));
+    const pending = refreshSession();
+
+    beginSession(token('login'));
+    respond(stale());
+    await pending;
+
+    expect(accessToken()).toBe('login');
+    expect(ended).not.toHaveBeenCalled();
   });
 });

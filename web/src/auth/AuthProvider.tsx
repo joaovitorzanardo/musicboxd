@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { setAuthRequiredHandler } from './apiFetch';
-import { fetchMe, login, logout } from './authApi';
+import { ApiError, fetchMe, login, logout } from './authApi';
 import { safeNext } from './safeNext';
-import { endSession, onSessionEnd, refreshSession, startSession } from './session';
+import { endSession, onSessionEnd, beginSession, refreshSession } from './session';
 import type { Account } from './types';
 
 export type AuthState = { status: 'loading' } | { status: 'guest' } | { status: 'signed-in'; account: Account };
@@ -43,9 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setState({ status: 'signed-in', account });
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          endSession();
+          // Only a refused token ends the session; a network failure or 5xx is not a logout.
+          if (error instanceof ApiError && error.status === 401) {
+            endSession();
+          }
           setState({ status: 'guest' });
         }
       }
@@ -69,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signIn = useCallback(async (email: string, password: string) => {
-    startSession(await login(email, password));
+    beginSession(await login(email, password));
     try {
       setState({ status: 'signed-in', account: await fetchMe() });
     } catch (error) {

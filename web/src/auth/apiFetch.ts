@@ -20,7 +20,7 @@ export function setAuthRequiredHandler(handler: () => void): () => void {
 /**
  * fetch for /api/v1. Sends the in-memory access token. If the token is already expired it refreshes first.
  * On a 401 it refreshes once (single-flight, shared with every other caller) and retries once.
- * A write that still ends in 401 is a Guest acting, so the auth-required handler runs (MBD-22).
+ * A write that ends in 401 because the refresh was refused is a Guest acting, so the auth-required handler runs (MBD-22).
  * Bodies must be strings (JSON), because a retry sends the same init again.
  */
 export async function apiFetch(path: string, init: ApiRequestInit = {}): Promise<Response> {
@@ -29,8 +29,9 @@ export async function apiFetch(path: string, init: ApiRequestInit = {}): Promise
     return fetch(path, withHeaders(request, null));
   }
 
+  let preSend: RefreshOutcome | null = null;
   if (isAccessTokenExpired()) {
-    await refreshSession();
+    preSend = await refreshSession();
   }
   const sentWith = accessToken();
   const first = await fetch(path, withHeaders(request, sentWith));
@@ -40,11 +41,16 @@ export async function apiFetch(path: string, init: ApiRequestInit = {}): Promise
 
   // Another caller may have refreshed while this request was out; then just retry with the new token.
   const current = accessToken();
-  const outcome: RefreshOutcome = current !== null && current !== sentWith ? 'refreshed' : await refreshSession();
+  const outcome: RefreshOutcome =
+    current !== null && current !== sentWith
+      ? 'refreshed'
+      : preSend !== null && preSend !== 'refreshed'
+        ? preSend // the refresh before sending already failed; do not ask again
+        : await refreshSession();
   const final = outcome === 'refreshed' ? await fetch(path, withHeaders(request, accessToken())) : first;
 
   const isWrite = !SAFE_METHODS.has((request.method ?? 'GET').toUpperCase());
-  if (final.status === 401 && isWrite && outcome !== 'unavailable') {
+  if (final.status === 401 && isWrite && outcome === 'signed-out') {
     authRequired();
   }
   return final;
