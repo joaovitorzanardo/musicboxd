@@ -32,6 +32,8 @@ dependencies {
 	implementation("org.postgresql:postgresql")
 	// BCrypt (AD-8). Only the crypto module: the full security starter arrives with the filter chain in Task 4.
 	implementation("org.springframework.security:spring-security-crypto")
+	// JWT encode/decode (Nimbus). Brought in alone so Boot's web security auto-config stays off until Task 4.
+	implementation("org.springframework.security:spring-security-oauth2-jose")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
