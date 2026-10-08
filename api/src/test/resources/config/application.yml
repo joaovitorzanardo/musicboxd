@@ -1,5 +1,11 @@
 # Test-only overrides. Spring Boot reads classpath:/config/application.yml after
 # classpath:/application.yml and lets it win, so main config stays the single source.
+spring:
+  cloud:
+    aws:
+      ses:
+        # Tests never call AWS: MailConfig's LoggingMailSender, or MailTestConfiguration's recorder.
+        enabled: false
 musicboxd:
   auth:
     # Base64 of "test-only-jwt-secret-not-for-prod-use!!" (39 bytes).

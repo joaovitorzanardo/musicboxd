@@ -6,6 +6,11 @@ server:
 spring:
   application:
     name: musicboxd-api
+  cloud:
+    aws:
+      # The SES identity lives in us-east-1 (runbook-mbd-18). Static, so startup never asks IMDS for a region.
+      region:
+        static: us-east-1
   datasource:
     # Compose hands the api the same postgres.env the database reads (AD-11: secrets in env files on the host).
     url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:musicboxd}

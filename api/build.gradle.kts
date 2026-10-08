@@ -22,6 +22,11 @@ repositories {
 }
 
 dependencies {
+	// Verification email through Amazon SES (MBD-18): Spring's MailSender over the SES API, credentials
+	// from the EC2 instance role (AD-11). Do not add jakarta.mail: it swaps in a JavaMailSender that
+	// needs ses:SendRawEmail.
+	implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:4.2.0"))
+	implementation("io.awspring.cloud:spring-cloud-aws-starter-ses")
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:3.1.1")
 	// Per-user rate limiting (AD-10): token buckets, held in a bounded per-policy cache.
@@ -54,7 +59,12 @@ openApi {
 	// The export boots the api only to read its contract (web/Dockerfile): no database, so migrations
 	// are off, and a throwaway signing key generated per run (never a committed secret).
 	customBootRun {
-		args.set(listOf("--musicboxd.migrations.enabled=false"))
+		args.set(listOf(
+			"--musicboxd.migrations.enabled=false",
+			"--spring.cloud.aws.ses.enabled=false",
+			"--musicboxd.verification.mail-from=export@localhost",
+			"--musicboxd.verification.link-base-url=http://localhost"
+		))
 		environment.put(
 			"MUSICBOXD_JWT_SECRET",
 			Base64.getEncoder().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
