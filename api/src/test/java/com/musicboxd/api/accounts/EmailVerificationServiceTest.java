@@ -10,13 +10,17 @@ import java.net.URI;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mail.SimpleMailMessage;
@@ -31,6 +35,7 @@ import com.musicboxd.api.profiles.UsernameTakenException;
  * service call must commit for real.
  */
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
 @Import({ TestcontainersConfiguration.class, MailTestConfiguration.class })
 class EmailVerificationServiceTest {
 
@@ -51,6 +56,7 @@ class EmailVerificationServiceTest {
 	@AfterEach
 	void mailWorksAgain() {
 		mail.failing(false);
+		mail.failingWith(null);
 	}
 
 	@Test
@@ -118,7 +124,8 @@ class EmailVerificationServiceTest {
 		assertThat(Duration.between(OffsetDateTime.now(), expiresAt))
 			.isBetween(Duration.ofHours(24).minusMinutes(1), Duration.ofHours(24));
 
-		jdbc.sql("UPDATE accounts.email_verification_tokens SET expires_at = now() - interval '1 second' WHERE account_id = :id")
+		jdbc.sql("UPDATE accounts.email_verification_tokens SET expires_at = :past WHERE account_id = :id")
+			.param("past", OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1))
 			.param("id", view.id()).update();
 		assertThatThrownBy(() -> verifications.verify(raw)).isInstanceOf(InvalidVerificationTokenException.class);
 		assertThatThrownBy(() -> accounts.authenticate(email, PASSWORD)).isInstanceOf(EmailNotVerifiedException.class);
@@ -203,6 +210,21 @@ class EmailVerificationServiceTest {
 		assertThat(accounts.describe(view.id()).email()).isEqualTo(email);
 
 		mail.failing(false);
+		verifications.resend(email);
+		verifications.verify(tokenFor(email));
+		assertThat(accounts.authenticate(email, PASSWORD)).isEqualTo(view.id());
+	}
+
+	@Test
+	void aNonMailSenderFailureIsLoggedWithTheAccountIdAndResendRecovers(CapturedOutput output) {
+		mail.failingWith(new IllegalStateException("Unable to load credentials"));
+		String email = uniqueEmail();
+		AccountView view = accounts.register(email, PASSWORD, uniqueUsername());
+		assertThat(mail.sentTo(email)).isEmpty();
+		assertThat(accounts.describe(view.id()).email()).isEqualTo(email);
+		assertThat(output.getAll()).contains("Verification email for account " + view.id() + " failed");
+
+		mail.failingWith(null);
 		verifications.resend(email);
 		verifications.verify(tokenFor(email));
 		assertThat(accounts.authenticate(email, PASSWORD)).isEqualTo(view.id());

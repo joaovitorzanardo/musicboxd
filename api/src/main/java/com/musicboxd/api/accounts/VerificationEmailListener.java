@@ -4,7 +4,6 @@ import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.mail.MailException;
 import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.stereotype.Component;
@@ -46,7 +45,9 @@ class VerificationEmailListener {
 		try {
 			mail.send(message);
 		}
-		catch (MailException e) {
+		catch (RuntimeException e) {
+			// Not only MailException: the SES sender wraps just SesException, so credential and network
+			// failures (SdkClientException) arrive unwrapped and must not escape the commit callback.
 			// Log the exception, never the message: its text holds a live link until it expires.
 			log.error("Verification email for account {} failed; the person can request another", event.accountId(), e);
 		}

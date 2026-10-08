@@ -156,6 +156,13 @@ fails with `Unable to load credentials from any of the providers in the chain`.
 No reboot is needed. Check it (V4) on the instance's **Details** tab: **IMDSv2: Required**. The hop limit
 shows when you reopen the same dialog.
 
+**Security trade-off.** With a hop limit of 2, every container on the host can reach the instance role's
+credentials, not only the api: that includes the internet-facing nginx/web container and postgres. The role
+carries `musicboxd-s3` (backups and images) and `musicboxd-ses`, so a compromised container or an SSRF in the
+api could read them. This is accepted for the MVP (it is the standard AWS guidance for containers). The
+follow-up hardening is an iptables rule in the `DOCKER-USER` chain that blocks `169.254.169.254` from every
+container except the api.
+
 ## 5. Prepare the host (console: EC2 → Connect → Session Manager)
 
 Open a shell: EC2 → Instances → `musicboxd-host` → **Connect** → **Session Manager** → **Connect**.
@@ -314,8 +321,10 @@ Record who did the check in the table below.
 
 ## Rollback
 
-There is no switch that turns verification off: an account that was never verified stays blocked by design.
-To roll back the code, redeploy the previous image (`sudo ./deploy.sh sha-<previous sha>` in
-`/opt/musicboxd`). The V2 migration stays applied, and the older code ignores the new column and table.
+There is no config switch that turns verification off while MBD-18 code is running. To roll back the code,
+redeploy the previous image (`sudo ./deploy.sh sha-<previous sha>` in `/opt/musicboxd`). Rolling back the
+image removes the login gate until MBD-18 is redeployed: the older code ignores `email_verified_at`, so
+unverified accounts can log in meanwhile. The V2 migration stays applied, and the older code ignores the new
+column and table.
 The two `api.env` lines are harmless to the older code. The AWS pieces (identity, policy, hop limit) can
 stay. They are needed again on the next deploy.

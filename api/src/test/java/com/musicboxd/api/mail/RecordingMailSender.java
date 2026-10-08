@@ -17,9 +17,13 @@ public class RecordingMailSender implements MailSender {
 
 	private final List<SimpleMailMessage> sent = new CopyOnWriteArrayList<>();
 	private volatile boolean failing;
+	private volatile RuntimeException failure;
 
 	@Override
 	public void send(SimpleMailMessage message) {
+		if (failure != null) {
+			throw failure;
+		}
 		if (failing) {
 			throw new MailSendException("simulated SES outage");
 		}
@@ -35,6 +39,11 @@ public class RecordingMailSender implements MailSender {
 
 	public void failing(boolean failing) {
 		this.failing = failing;
+	}
+
+	/** Simulates a non-mail failure such as a credential or network error; null clears it. */
+	public void failingWith(RuntimeException failure) {
+		this.failure = failure;
 	}
 
 	public List<SimpleMailMessage> sentTo(String to) {
