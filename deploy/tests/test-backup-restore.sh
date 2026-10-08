@@ -11,6 +11,8 @@ TMP=$(mktemp -d)
 mkdir -p "$TMP/bin" "$TMP/s3" "$TMP/work"
 printf 'DOMAIN=example.test\nGHCR_OWNER=someone\nIMAGE_TAG=latest\nBACKUP_BUCKET=test-bucket\nAWS_REGION=us-east-1\n' > "$TMP/stack.env"
 printf 'POSTGRES_DB=musicboxd\nPOSTGRES_USER=musicboxd\nPOSTGRES_PASSWORD=x\n' > "$TMP/postgres.env"
+printf 'MUSICBOXD_JWT_SECRET=x
+' > "$TMP/api.env"
 cp "$HERE/fake-aws" "$TMP/bin/aws"
 source "$HERE/lib.sh"
 stub_flock_if_missing

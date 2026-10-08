@@ -3,6 +3,16 @@ services:
     build:
       context: ../api
     restart: on-failure
+    environment:
+      POSTGRES_DB: musicboxd
+      POSTGRES_USER: musicboxd
+      POSTGRES_PASSWORD: musicboxd
+      # Local-dev-only signing key (Base64 of a fixed 40-byte string); production reads
+      # MUSICBOXD_JWT_SECRET from /etc/musicboxd/api.env (runbook-mbd-17-auth.md).
+      MUSICBOXD_JWT_SECRET: bG9jYWwtZGV2LWp3dC1zZWNyZXQtbmV2ZXItdXNlLWluLXByb2QhIQ==
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - internal
     # No ports published: reached only through nginx's proxy (AD-11).
@@ -32,6 +42,11 @@ services:
       - postgres_data:/var/lib/postgresql
     networks:
       - internal
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
     # No ports published: Postgres is reachable only on the internal
     # Docker network (AD-11).
 
