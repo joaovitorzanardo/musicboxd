@@ -48,7 +48,8 @@ describe('AuthProvider', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Avaliar' }));
 
-    expect(await screen.findByTestId('page')).toHaveTextContent('cadastro?next=/album/42');
+    expect(await screen.findByRole('heading', { name: 'Criar conta' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/entrar?next=%2Falbum%2F42');
   });
 
   it('signing out revokes the cookie and leaves a Guest', async () => {
