@@ -46,6 +46,9 @@ musicboxd:
     refresh-token:
       ttl: 30d
       grace: 10s
+  # MBD-21: promotes this account to STAFF on every start (R__promote_bootstrap_staff.sql). Optional;
+  # the account must already exist (runbook-mbd-21-staff-bootstrap.md). Removing it does not demote.
+  bootstrap-staff-email: ${MUSICBOXD_BOOTSTRAP_STAFF_EMAIL:}
   verification:
     # No defaults: the api refuses to start without them (/etc/musicboxd/api.env, runbook-mbd-18).
     link-base-url: ${MUSICBOXD_PUBLIC_BASE_URL:}

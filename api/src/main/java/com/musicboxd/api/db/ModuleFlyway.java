@@ -1,5 +1,7 @@
 package com.musicboxd.api.db;
 
+import java.util.Map;
+
 import javax.sql.DataSource;
 
 import org.flywaydb.core.Flyway;
@@ -15,12 +17,18 @@ public final class ModuleFlyway {
 	}
 
 	public static Flyway forSchema(DataSource dataSource, String schema) {
+		return forSchema(dataSource, schema, Map.of());
+	}
+
+	/** Placeholders are substituted as plain text into the module's SQL: validate any value that comes from outside. */
+	public static Flyway forSchema(DataSource dataSource, String schema, Map<String, String> placeholders) {
 		return Flyway.configure()
 			.dataSource(dataSource)
 			.schemas(schema)
 			.defaultSchema(schema)
 			.createSchemas(true)
 			.locations("classpath:db/migration/" + schema)
+			.placeholders(placeholders)
 			.load();
 	}
 }

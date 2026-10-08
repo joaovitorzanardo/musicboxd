@@ -14,6 +14,8 @@ services:
       SPRING_CLOUD_AWS_SES_ENABLED: "false"
       MUSICBOXD_MAIL_FROM: no-reply@localhost
       MUSICBOXD_PUBLIC_BASE_URL: http://localhost
+      # MBD-21 local dev: register this email, verify it, then restart the api to make it STAFF.
+      MUSICBOXD_BOOTSTRAP_STAFF_EMAIL: staff@localhost.test
     depends_on:
       postgres:
         condition: service_healthy
