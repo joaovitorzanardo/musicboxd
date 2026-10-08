@@ -1,5 +1,7 @@
 package com.musicboxd.api.security;
 
+import java.util.Set;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +24,9 @@ import jakarta.servlet.DispatcherType;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+	private static final Set<String> PUBLIC_AUTH_PATHS = Set.of("/api/v1/auth/register", "/api/v1/auth/login",
+			"/api/v1/auth/verification-email", "/api/v1/auth/verify", "/api/v1/auth/refresh");
 
 	@Bean
 	SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
@@ -50,11 +55,12 @@ public class SecurityConfig {
 	}
 
 	/**
-	 * Auth endpoints are public and never read a bearer token. Without this, an expired JWT that an SPA
-	 * interceptor attaches to every call would make the refresh itself fail with 401.
+	 * The public auth endpoints never read a bearer token. Without this, an expired JWT that an SPA
+	 * interceptor attaches to every call would make the refresh itself fail with 401. Exact paths, not a
+	 * prefix: any other /api/v1/auth route still authenticates with its bearer token.
 	 */
 	private static BearerTokenResolver bearerTokenResolver() {
 		var defaults = new DefaultBearerTokenResolver();
-		return request -> request.getRequestURI().startsWith("/api/v1/auth/") ? null : defaults.resolve(request);
+		return request -> PUBLIC_AUTH_PATHS.contains(request.getRequestURI()) ? null : defaults.resolve(request);
 	}
 }

@@ -31,7 +31,9 @@ class RefreshTokenService {
 	/** Starts a new family: one per login, so revoking it logs out only that device. */
 	@Transactional
 	public String issue(UUID accountId) {
-		return insertSuccessor(UUID.randomUUID(), accountId, clock.instant());
+		UUID familyId = UUID.randomUUID();
+		tokens.insertFamily(familyId, accountId);
+		return insertSuccessor(familyId, accountId, clock.instant());
 	}
 
 	/**
@@ -42,7 +44,7 @@ class RefreshTokenService {
 		String hash = OpaqueTokens.hash(rawToken);
 		var token = tokens.findForUpdate(hash).orElseThrow(InvalidRefreshTokenException::new);
 		Instant now = clock.instant();
-		if (token.revokedAt() != null || !now.isBefore(token.expiresAt())) {
+		if (tokens.lockFamilyAndCheckRevoked(token.familyId()) || !now.isBefore(token.expiresAt())) {
 			throw new InvalidRefreshTokenException();
 		}
 		if (token.rotatedAt() == null) {

@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.musicboxd.api.TestcontainersConfiguration;
+import com.musicboxd.api.accounts.TokenService;
 
 /** AD-7: public GETs need no token; writes need one; the contract documents the bearer scheme. */
 @SpringBootTest
@@ -23,6 +26,9 @@ class SecurityRulesTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private TokenService tokens;
+
 	@Test
 	void publicGetsNeedNoToken() throws Exception {
 		mockMvc.perform(get("/api/v1/health")).andExpect(status().isOk());
@@ -32,6 +38,15 @@ class SecurityRulesTest {
 	@Test
 	void unauthenticatedWriteIsRejectedBeforeRouting() throws Exception {
 		mockMvc.perform(post("/api/v1/health")).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void bearerTokensStillAuthenticateUnderTheAuthPrefix() throws Exception {
+		// Only the public auth endpoints ignore bearer headers; a future authenticated /api/v1/auth route
+		// (MBD-20's logout, a password change) must still see a valid token. No such route exists, so 404.
+		String token = tokens.issue(UUID.randomUUID()).value();
+		mockMvc.perform(post("/api/v1/auth/not-a-route").header("Authorization", "Bearer " + token))
+			.andExpect(status().isNotFound());
 	}
 
 	@Test

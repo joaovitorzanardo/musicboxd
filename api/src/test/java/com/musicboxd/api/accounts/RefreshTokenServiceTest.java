@@ -16,12 +16,15 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.musicboxd.api.TestcontainersConfiguration;
 
@@ -38,6 +41,9 @@ class RefreshTokenServiceTest {
 
 	@Autowired
 	private JdbcClient jdbc;
+
+	@Autowired
+	private PlatformTransactionManager transactions;
 
 	@Test
 	void onlyTheSha256IsStoredAndItExpiresInThirtyDays() throws Exception {
@@ -142,6 +148,35 @@ class RefreshTokenServiceTest {
 		}
 	}
 
+	@Test
+	void revocationAlsoKillsASuccessorThatIsBeingIssuedConcurrently() throws Exception {
+		String stolen = refreshTokens.issue(newAccount());
+		String live = refreshTokens.rotate(stolen).refreshToken();
+		ageRotation(stolen, Duration.ofSeconds(11));
+
+		var rotated = new CountDownLatch(1);
+		var commit = new CountDownLatch(1);
+		try (var pool = Executors.newFixedThreadPool(2)) {
+			// The victim's tab rotates the live token; its transaction has not committed yet.
+			Future<String> successor = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+				String next = refreshTokens.rotate(live).refreshToken();
+				rotated.countDown();
+				await(commit);
+				return next;
+			}));
+			assertThat(rotated.await(10, SECONDS)).isTrue();
+			// Meanwhile the stolen token is replayed after the grace window, which revokes the family.
+			Future<?> replay = pool.submit(() -> assertThatThrownBy(() -> refreshTokens.rotate(stolen))
+				.isInstanceOf(InvalidRefreshTokenException.class));
+			Thread.sleep(500); // let the replay reach the database before the victim's tab commits
+			commit.countDown();
+			replay.get(10, SECONDS);
+
+			String next = successor.get(10, SECONDS);
+			assertThatThrownBy(() -> refreshTokens.rotate(next)).isInstanceOf(InvalidRefreshTokenException.class);
+		}
+	}
+
 	private UUID newAccount() {
 		return accounts.register(uniqueEmail(), "correct-horse", uniqueUsername()).id();
 	}
@@ -151,5 +186,15 @@ class RefreshTokenServiceTest {
 		jdbc.sql("UPDATE accounts.refresh_tokens SET rotated_at = :at WHERE token_hash = :hash")
 			.param("at", OffsetDateTime.now(ZoneOffset.UTC).minus(ago))
 			.param("hash", OpaqueTokens.hash(raw)).update();
+	}
+
+	private static void await(CountDownLatch latch) {
+		try {
+			assertThat(latch.await(10, SECONDS)).isTrue();
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		}
 	}
 }
