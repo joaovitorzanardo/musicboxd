@@ -1,3 +1,6 @@
+import java.security.SecureRandom
+import java.util.Base64
+
 plugins {
 	java
 	id("org.springframework.boot") version "4.1.1"
@@ -50,4 +53,13 @@ tasks.withType<Test> {
 
 openApi {
 	apiDocsUrl.set("http://localhost:8080/api/v1/api-docs")
+	// The export boots the api only to read its contract (web/Dockerfile): no database, so migrations
+	// are off, and a throwaway signing key generated per run (never a committed secret).
+	customBootRun {
+		args.set(listOf("--musicboxd.migrations.enabled=false"))
+		environment.put(
+			"MUSICBOXD_JWT_SECRET",
+			Base64.getEncoder().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
+		)
+	}
 }
