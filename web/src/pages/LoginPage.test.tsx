@@ -55,7 +55,8 @@ describe('LoginPage', () => {
 
     await fillAndSubmit('ana@exemplo.com', 'correct-horse');
 
-    expect(await screen.findByTestId('page')).toHaveTextContent('/verifique-email');
+    expect(await screen.findByRole('heading', { name: 'Verifique seu email' })).toBeInTheDocument();
+    expect(screen.getByText('ana@exemplo.com')).toBeInTheDocument();
   });
 
   it('asks for the missing fields without calling the API', async () => {

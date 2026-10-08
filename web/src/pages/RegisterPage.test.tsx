@@ -38,7 +38,8 @@ describe('RegisterPage', () => {
 
     await fill('@ana_silva', ' ana@exemplo.com ', 'correct-horse');
 
-    expect(await screen.findByTestId('page')).toHaveTextContent('/verifique-email');
+    expect(await screen.findByRole('heading', { name: 'Verifique seu email' })).toBeInTheDocument();
+    expect(screen.getByText('ana@exemplo.com')).toBeInTheDocument();
     expect(JSON.parse(calls.find((c) => c.url === '/api/v1/auth/register')!.init.body as string)).toEqual({
       username: 'ana_silva', // a typed leading "@" is dropped
       email: 'ana@exemplo.com',
