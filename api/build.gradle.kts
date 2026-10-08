@@ -24,8 +24,17 @@ dependencies {
 	// Per-user rate limiting (AD-10): token buckets, held in a bounded per-policy cache.
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.21.0")
 	implementation("com.github.ben-manes.caffeine:caffeine")
+	// Persistence: plain JDBC, one Flyway instance per module schema (spine: Migrations).
+	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	implementation("org.flywaydb:flyway-database-postgresql")
+	// Compile scope, not runtimeOnly: Constraints reads PSQLException's constraint name.
+	implementation("org.postgresql:postgresql")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
+	testImplementation("org.springframework.boot:spring-boot-testcontainers")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+	testImplementation("org.testcontainers:testcontainers-postgresql")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.musicboxd.api.TestcontainersConfiguration;
 
 /**
  * MBD-13 acceptance: the demo endpoint rejects a caller past its configured per-user
@@ -19,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 	"musicboxd.rate-limit.policies.demo.capacity=2",
 	"musicboxd.rate-limit.policies.demo.refill-period=1h" })
 @AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
 class DemoRateLimitControllerTest {
 
 	@Autowired
