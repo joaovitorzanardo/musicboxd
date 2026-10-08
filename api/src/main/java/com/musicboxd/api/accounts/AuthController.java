@@ -2,7 +2,10 @@ package com.musicboxd.api.accounts;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,11 +63,16 @@ public class AuthController {
 
 	private final AccountService accounts;
 	private final TokenService tokens;
+	private final RefreshTokenService refreshTokens;
+	private final RefreshTokenProperties refreshProps;
 	private final EmailVerificationService verifications;
 
-	AuthController(AccountService accounts, TokenService tokens, EmailVerificationService verifications) {
+	AuthController(AccountService accounts, TokenService tokens, RefreshTokenService refreshTokens,
+			RefreshTokenProperties refreshProps, EmailVerificationService verifications) {
 		this.accounts = accounts;
 		this.tokens = tokens;
+		this.refreshTokens = refreshTokens;
+		this.refreshProps = refreshProps;
 		this.verifications = verifications;
 	}
 
@@ -78,14 +86,28 @@ public class AuthController {
 	}
 
 	@PostMapping("/login")
-	@ApiResponse(responseCode = "200", description = "A short-lived bearer access token")
+	@ApiResponse(responseCode = "200",
+			description = "A short-lived bearer access token; the refresh token is set as an HttpOnly cookie")
 	@ApiResponse(responseCode = "401", description = "Unknown email or wrong password (indistinguishable)")
 	@ApiResponse(responseCode = "403",
 			description = "Right password, email not verified yet (type urn:musicboxd:problem:email-not-verified)")
-	public TokenResponse login(@Valid @RequestBody LoginRequest request) {
+	public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
 		UUID accountId = accounts.authenticate(request.email(), request.password());
-		var token = tokens.issue(accountId);
-		return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds());
+		return withSession(accountId, refreshTokens.issue(accountId));
+	}
+
+	/** The browser sends the cookie on its own; the SPA calls this when an access token expires or on page load. */
+	@PostMapping("/refresh")
+	@ApiResponse(responseCode = "200", description = "A new access token; the refresh cookie is rotated")
+	@ApiResponse(responseCode = "401",
+			description = "Missing, expired, revoked or reused refresh token (type urn:musicboxd:problem:invalid-refresh-token)")
+	public ResponseEntity<TokenResponse> refresh(
+			@CookieValue(name = RefreshCookies.NAME, required = false) String refreshToken) {
+		if (refreshToken == null || refreshToken.isBlank()) {
+			throw new InvalidRefreshTokenException();
+		}
+		var rotation = refreshTokens.rotate(refreshToken);
+		return withSession(rotation.accountId(), rotation.refreshToken());
 	}
 
 	/** The emailed link points here. MBD-22 may move the link to an SPA page that calls this same endpoint. */
@@ -105,5 +127,12 @@ public class AuthController {
 	@ApiResponse(responseCode = "429", description = "Too many requests from this caller; see Retry-After")
 	public void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
 		verifications.resend(request.email());
+	}
+
+	private ResponseEntity<TokenResponse> withSession(UUID accountId, String refreshToken) {
+		var access = tokens.issue(accountId);
+		return ResponseEntity.ok()
+			.header(HttpHeaders.SET_COOKIE, RefreshCookies.issue(refreshToken, refreshProps.ttl()).toString())
+			.body(new TokenResponse(access.value(), "Bearer", access.expiresInSeconds()));
 	}
 }
