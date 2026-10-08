@@ -30,6 +30,8 @@ dependencies {
 	implementation("org.flywaydb:flyway-database-postgresql")
 	// Compile scope, not runtimeOnly: Constraints reads PSQLException's constraint name.
 	implementation("org.postgresql:postgresql")
+	// BCrypt (AD-8). Only the crypto module: the full security starter arrives with the filter chain in Task 4.
+	implementation("org.springframework.security:spring-security-crypto")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
