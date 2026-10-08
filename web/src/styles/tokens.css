@@ -1,0 +1,45 @@
+:root {
+  --coral: #ff5a3c;
+  --on-coral: #111317;
+  --bg: #111317;
+  --fg: #f3efe8;
+  --muted: rgba(243, 239, 232, 0.62);
+  --line: rgba(243, 239, 232, 0.14);
+  --card: #1a1d22;
+  --err: #ff8a73;
+  --err-bg: rgba(255, 90, 60, 0.12);
+  --font-display: Outfit, system-ui, sans-serif;
+  --font-body: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+
+.home {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+.home-account {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.home a {
+  color: var(--fg);
+  font-weight: 600;
+}

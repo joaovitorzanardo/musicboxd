@@ -1,0 +1,271 @@
+.auth-page h1,
+.btn {
+  font-family: var(--font-display);
+}
+
+.auth-brand {
+  display: flex;
+  justify-content: center;
+  padding: 40px 32px 0;
+}
+
+.auth-logo {
+  display: block;
+  width: 260px;
+  max-width: 70%;
+}
+
+.auth-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.auth-main {
+  display: flex;
+  justify-content: center;
+  padding: 28px 32px 48px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 24px;
+}
+
+.auth-card--center {
+  text-align: center;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.auth-lead {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.auth-form {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font: inherit;
+  font-size: 15px;
+}
+
+.field input::placeholder {
+  color: var(--muted);
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 1px;
+  border-color: var(--coral);
+}
+
+.field input.is-bad {
+  border-color: var(--err);
+}
+
+.field-control {
+  position: relative;
+}
+
+.field-control--prefix span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.field-control--prefix input {
+  padding-left: 32px;
+}
+
+.field-control--trailing input {
+  padding-right: 48px;
+}
+
+.field-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.field-toggle:hover {
+  color: var(--fg);
+}
+
+.field-help,
+.field-error {
+  margin: 0;
+  font-size: 13px;
+}
+
+.field-help {
+  color: var(--muted);
+}
+
+.field-error {
+  color: var(--err);
+  font-weight: 500;
+}
+
+.field-error a {
+  color: var(--err);
+}
+
+.alert {
+  margin-top: 14px;
+  background: var(--err-bg);
+  border: 1px solid var(--err);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.alert b {
+  color: var(--err);
+}
+
+.auth-ok {
+  margin: 16px 0 0;
+  font-size: 14px;
+  background: var(--err-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-mail {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px solid var(--coral);
+  color: var(--coral);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+}
+
+.btn {
+  background: var(--coral);
+  color: var(--on-coral);
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.btn--secondary {
+  background: transparent;
+  color: var(--fg);
+  border: 1.5px solid var(--fg);
+}
+
+.btn--full {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-card--center .btn--full {
+  margin-top: 16px;
+}
+
+.btn:disabled,
+.field-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible,
+.field-toggle:focus-visible,
+.auth-page a:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 3px;
+}
+
+.auth-alt {
+  margin: 14px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.auth-card a {
+  color: var(--fg);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.auth-alt a:hover {
+  color: var(--coral);
+}
+
+@media (max-width: 480px) {
+  .auth-brand {
+    padding: 32px 16px 0;
+  }
+
+  .auth-logo {
+    width: 200px;
+  }
+
+  .auth-main {
+    padding: 20px 16px 32px;
+  }
+
+  .auth-card {
+    padding: 20px 18px;
+  }
+
+  .auth-card h1 {
+    font-size: 22px;
+  }
+}

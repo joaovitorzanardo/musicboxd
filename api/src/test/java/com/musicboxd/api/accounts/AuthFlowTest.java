@@ -172,15 +172,18 @@ class AuthFlowTest {
 	}
 
 	@Test
-	void duplicateEmailOrUsernameIsAConflict() throws Exception {
+	void duplicateEmailOrUsernameIsAConflictWithItsOwnProblemType() throws Exception {
 		String email = uniqueEmail();
 		String username = uniqueUsername();
 		register(email, PASSWORD, username).andExpect(status().isCreated());
 
 		register(email.toUpperCase(), PASSWORD, uniqueUsername())
 			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.status").value(409));
-		register(uniqueEmail(), PASSWORD, username.toUpperCase()).andExpect(status().isConflict());
+			.andExpect(jsonPath("$.status").value(409))
+			.andExpect(jsonPath("$.type").value("urn:musicboxd:problem:email-taken"));
+		register(uniqueEmail(), PASSWORD, username.toUpperCase())
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.type").value("urn:musicboxd:problem:username-taken"));
 	}
 
 	@Test

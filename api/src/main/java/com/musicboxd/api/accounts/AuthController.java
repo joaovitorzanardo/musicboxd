@@ -81,7 +81,7 @@ public class AuthController {
 	@ResponseStatus(HttpStatus.CREATED)
 	@ApiResponse(responseCode = "201", description = "Account and profile created")
 	@ApiResponse(responseCode = "400", description = "Invalid email, password or username")
-	@ApiResponse(responseCode = "409", description = "Email or username already taken")
+	@ApiResponse(responseCode = "409", description = "Email or username already taken (type urn:musicboxd:problem:email-taken or urn:musicboxd:problem:username-taken)")
 	public AccountView register(@Valid @RequestBody RegisterRequest request) {
 		return accounts.register(request.email(), request.password(), request.username());
 	}
