@@ -56,12 +56,14 @@ class AuthFlowTest {
 		String email = uniqueEmail();
 		String username = uniqueUsername();
 
-		register(email, PASSWORD, username)
+		String registered = register(email, PASSWORD, username)
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.id").isString())
 			.andExpect(jsonPath("$.email").value(email))
 			.andExpect(jsonPath("$.username").value(username))
-			.andExpect(jsonPath("$.password").doesNotExist());
+			.andExpect(jsonPath("$.password").doesNotExist())
+			.andReturn().getResponse().getContentAsString();
+		markVerified(registered);
 
 		String body = login(email, PASSWORD)
 			.andExpect(status().isOk())
@@ -79,9 +81,11 @@ class AuthFlowTest {
 	@Test
 	void emailWithSurroundingWhitespaceRegistersLowercasedOverHttp() throws Exception {
 		String email = uniqueEmail();
-		register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername())
+		String registered = register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername())
 			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.email").value(email));
+			.andExpect(jsonPath("$.email").value(email))
+			.andReturn().getResponse().getContentAsString();
+		markVerified(registered);
 		login(email, PASSWORD).andExpect(status().isOk());
 	}
 
@@ -173,6 +177,10 @@ class AuthFlowTest {
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.status").value(409));
 		register(uniqueEmail(), PASSWORD, username.toUpperCase()).andExpect(status().isConflict());
+	}
+
+	private void markVerified(String registerResponseBody) {
+		AccountServiceTest.markVerified(jdbc, UUID.fromString(JsonPath.read(registerResponseBody, "$.id")));
 	}
 
 	private ResultActions register(String email, String password, String username) throws Exception {

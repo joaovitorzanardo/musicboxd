@@ -21,24 +21,27 @@ public class AccountService {
 
 	private final AccountRepository accounts;
 	private final ProfilesApi profiles;
+	private final EmailVerificationService verifications;
 	private final PasswordEncoder passwordEncoder;
 	/** Checked when the email is unknown, so a miss costs the same hash as a wrong password. */
 	private final String dummyHash;
 
-	AccountService(AccountRepository accounts, ProfilesApi profiles, PasswordEncoder passwordEncoder) {
+	AccountService(AccountRepository accounts, ProfilesApi profiles, EmailVerificationService verifications,
+			PasswordEncoder passwordEncoder) {
 		this.accounts = accounts;
 		this.profiles = profiles;
+		this.verifications = verifications;
 		this.passwordEncoder = passwordEncoder;
 		this.dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
 	}
 
-	/** Creates the account and its profile in one transaction: both or neither. */
+	/** Creates the account, its profile and its verification link in one transaction: all or nothing. */
 	@Transactional
 	public AccountView register(String email, String password, String username) {
 		if (tooLong(password)) {
 			throw new PasswordTooLongException();
 		}
-		var account = new Account(UUID.randomUUID(), normalize(email), passwordEncoder.encode(password));
+		var account = new Account(UUID.randomUUID(), normalize(email), passwordEncoder.encode(password), null);
 		try {
 			accounts.insert(account);
 		}
@@ -49,6 +52,7 @@ public class AccountService {
 			throw e;
 		}
 		profiles.createProfile(account.id(), username);
+		verifications.issue(account.id(), account.email());
 		return new AccountView(account.id(), account.email(), username);
 	}
 
@@ -63,6 +67,11 @@ public class AccountService {
 		if (!passwordEncoder.matches(password, hash) || account.isEmpty()) {
 			throw new InvalidCredentialsException();
 		}
+		// After the password check, so only someone holding the password learns the email is unverified.
+		// This is the only path to an access token (AuthController.login), so the gate covers every login.
+		if (!account.get().emailVerified()) {
+			throw new EmailNotVerifiedException();
+		}
 		return account.get().id();
 	}
 
@@ -73,7 +82,7 @@ public class AccountService {
 		return new AccountView(accountId, account.email(), username);
 	}
 
-	private static String normalize(String email) {
+	static String normalize(String email) {
 		return email.strip().toLowerCase(Locale.ROOT);
 	}
 

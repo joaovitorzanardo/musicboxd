@@ -38,3 +38,8 @@ musicboxd:
     # No default on purpose: the api refuses to start without it.
     jwt-secret: ${MUSICBOXD_JWT_SECRET:}
     access-token-ttl: 15m
+  verification:
+    # No defaults: the api refuses to start without them (/etc/musicboxd/api.env, runbook-mbd-18).
+    link-base-url: ${MUSICBOXD_PUBLIC_BASE_URL:}
+    mail-from: ${MUSICBOXD_MAIL_FROM:}
+    ttl: 24h

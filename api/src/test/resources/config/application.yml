@@ -10,3 +10,6 @@ musicboxd:
   auth:
     # Base64 of "test-only-jwt-secret-not-for-prod-use!!" (39 bytes).
     jwt-secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtbm90LWZvci1wcm9kLXVzZSEh
+  verification:
+    link-base-url: http://localhost
+    mail-from: no-reply@test.invalid

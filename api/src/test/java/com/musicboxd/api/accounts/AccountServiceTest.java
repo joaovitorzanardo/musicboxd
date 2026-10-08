@@ -58,6 +58,7 @@ class AccountServiceTest {
 		String email = uniqueEmail();
 		AccountView view = accounts.register("  " + email.toUpperCase() + " ", PASSWORD, uniqueUsername());
 		assertThat(view.email()).isEqualTo(email);
+		markVerified(jdbc, view.id());
 		assertThat(accounts.authenticate(email.toUpperCase(), PASSWORD)).isEqualTo(view.id());
 	}
 
@@ -95,6 +96,7 @@ class AccountServiceTest {
 	void correctPasswordAuthenticates() {
 		String email = uniqueEmail();
 		AccountView view = accounts.register(email, PASSWORD, uniqueUsername());
+		markVerified(jdbc, view.id());
 		assertThat(accounts.authenticate(email, PASSWORD)).isEqualTo(view.id());
 	}
 
@@ -122,6 +124,11 @@ class AccountServiceTest {
 	void describeUnknownAccountIsNotFound() {
 		assertThatThrownBy(() -> accounts.describe(UUID.randomUUID()))
 			.isInstanceOf(AccountNotFoundException.class);
+	}
+
+	/** Accounts in tests that are not about verification skip the email round trip. */
+	static void markVerified(JdbcClient jdbc, UUID accountId) {
+		jdbc.sql("UPDATE accounts.accounts SET email_verified_at = now() WHERE id = :id").param("id", accountId).update();
 	}
 
 	static String uniqueEmail() {
