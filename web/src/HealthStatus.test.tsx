@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import App from './App';
+import { HealthStatus } from './HealthStatus';
 
-describe('App', () => {
+describe('HealthStatus', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
   });
@@ -19,7 +19,7 @@ describe('App', () => {
       }),
     );
 
-    render(<App />);
+    render(<HealthStatus />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Checking API health…');
 
@@ -31,7 +31,7 @@ describe('App', () => {
   it('shows a visible error state, not an unhandled rejection, when the API is unreachable', async () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
 
-    render(<App />);
+    render(<HealthStatus />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the API');
   });
@@ -39,7 +39,7 @@ describe('App', () => {
   it('shows an error state, not "undefined", when the response body has no string status', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
 
-    render(<App />);
+    render(<HealthStatus />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Malformed health response');
   });
@@ -47,7 +47,7 @@ describe('App', () => {
   it('shows an error state when the API responds with a non-2xx status', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response('', { status: 500 }));
 
-    render(<App />);
+    render(<HealthStatus />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Health check failed with status 500',
