@@ -13,7 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.musicboxd.api.db.ModuleFlyway;
 
 @Configuration
-@EnableConfigurationProperties(VerificationProperties.class)
+@EnableConfigurationProperties({ VerificationProperties.class, RefreshTokenProperties.class })
 class AccountsConfig {
 
 	// Off only for the OpenAPI export boot (web/Dockerfile), which has no database.

@@ -42,6 +42,10 @@ musicboxd:
     # No default on purpose: the api refuses to start without it.
     jwt-secret: ${MUSICBOXD_JWT_SECRET:}
     access-token-ttl: 15m
+    # MBD-19: opaque, rotated on every use; a rotated-out token still works for `grace` (AD-8).
+    refresh-token:
+      ttl: 30d
+      grace: 10s
   verification:
     # No defaults: the api refuses to start without them (/etc/musicboxd/api.env, runbook-mbd-18).
     link-base-url: ${MUSICBOXD_PUBLIC_BASE_URL:}
