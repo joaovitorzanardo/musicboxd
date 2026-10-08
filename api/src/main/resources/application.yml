@@ -6,6 +6,14 @@ server:
 spring:
   application:
     name: musicboxd-api
+  datasource:
+    # Compose hands the api the same postgres.env the database reads (AD-11: secrets in env files on the host).
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:musicboxd}
+    username: ${POSTGRES_USER:musicboxd}
+    password: ${POSTGRES_PASSWORD:}
+  flyway:
+    # Boot's single Flyway is off: each module migrates its own schema (see db.ModuleFlyway).
+    enabled: false
 
 springdoc:
   api-docs:
@@ -13,10 +21,15 @@ springdoc:
   swagger-ui:
     enabled: false
 
-# AD-10 layer 2: named per-user limit policies, applied with @RateLimited(policy = "...").
 musicboxd:
+  # AD-10 layer 2: named per-user limit policies, applied with @RateLimited(policy = "...").
   rate-limit:
     policies:
       demo:
         capacity: 5
         refill-period: 1m
+  auth:
+    # Base64 of >= 32 random bytes (openssl rand -base64 32), from /etc/musicboxd/api.env.
+    # No default on purpose: the api refuses to start without it.
+    jwt-secret: ${MUSICBOXD_JWT_SECRET:}
+    access-token-ttl: 15m

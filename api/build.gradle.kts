@@ -1,3 +1,6 @@
+import java.security.SecureRandom
+import java.util.Base64
+
 plugins {
 	java
 	id("org.springframework.boot") version "4.1.1"
@@ -24,8 +27,21 @@ dependencies {
 	// Per-user rate limiting (AD-10): token buckets, held in a bounded per-policy cache.
 	implementation("com.bucket4j:bucket4j_jdk17-core:8.21.0")
 	implementation("com.github.ben-manes.caffeine:caffeine")
+	// Persistence: plain JDBC, one Flyway instance per module schema (spine: Migrations).
+	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	implementation("org.flywaydb:flyway-database-postgresql")
+	// Compile scope, not runtimeOnly: Constraints reads PSQLException's constraint name.
+	implementation("org.postgresql:postgresql")
+	// Spring Security filter chain validating bearer JWTs (AD-8); brings spring-security-oauth2-jose.
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
+	implementation("org.springframework.boot:spring-boot-starter-validation")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	testImplementation("org.springframework.boot:spring-boot-webmvc-test")
+	testImplementation("org.springframework.boot:spring-boot-testcontainers")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+	testImplementation("org.testcontainers:testcontainers-postgresql")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -35,4 +51,13 @@ tasks.withType<Test> {
 
 openApi {
 	apiDocsUrl.set("http://localhost:8080/api/v1/api-docs")
+	// The export boots the api only to read its contract (web/Dockerfile): no database, so migrations
+	// are off, and a throwaway signing key generated per run (never a committed secret).
+	customBootRun {
+		args.set(listOf("--musicboxd.migrations.enabled=false"))
+		environment.put(
+			"MUSICBOXD_JWT_SECRET",
+			Base64.getEncoder().encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) })
+		)
+	}
 }

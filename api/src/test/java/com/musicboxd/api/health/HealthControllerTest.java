@@ -7,14 +7,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.musicboxd.api.security.JwtConfig;
+import com.musicboxd.api.security.SecurityConfig;
 
 /**
  * Proves the exact contract nginx proxies to (AD-7): {@code GET /api/v1/health}
  * returns 200 and {@code {"status":"ok"}}.
  */
 @WebMvcTest(HealthController.class)
+@Import({ SecurityConfig.class, JwtConfig.class })
 class HealthControllerTest {
 
 	@Autowired

@@ -1,0 +1,6 @@
+# Test-only overrides. Spring Boot reads classpath:/config/application.yml after
+# classpath:/application.yml and lets it win, so main config stays the single source.
+musicboxd:
+  auth:
+    # Base64 of "test-only-jwt-secret-not-for-prod-use!!" (39 bytes).
+    jwt-secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtbm90LWZvci1wcm9kLXVzZSEh

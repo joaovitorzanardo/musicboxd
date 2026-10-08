@@ -14,7 +14,13 @@ services:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set in /etc/musicboxd/stack.env}/musicboxd-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     logging: *default-logging
-    env_file: ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
+    # postgres.env: DB name and credentials shared with postgres; api.env: MUSICBOXD_JWT_SECRET (MBD-17).
+    env_file:
+      - ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/postgres.env
+      - ${MUSICBOXD_ENV_DIR:-/etc/musicboxd}/api.env
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks: [internal]
     # No ports published: reached only through nginx (AD-11).
     healthcheck:
@@ -32,6 +38,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     networks: [internal]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 10
     # No ports published (AD-11).
 
   nginx:
