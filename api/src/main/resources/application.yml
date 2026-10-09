@@ -45,8 +45,9 @@ musicboxd:
       register-per-ip:
         capacity: 10
         refill-period: 1h
+      # Generous: a 409 username-taken retry costs a token too, and the next sign-up must still work.
       register-per-email:
-        capacity: 3
+        capacity: 8
         refill-period: 1h
       # MBD-18 resend. Per IP as before; per email bounds what one inbox can be sent from any IPs.
       verification-email-per-ip:

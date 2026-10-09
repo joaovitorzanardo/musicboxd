@@ -17,7 +17,7 @@ The email key is the normalized address (`strip` + lowercase), hashed. It is the
 | `login-per-ip` | 20 / 15m | `POST /api/v1/auth/login` |
 | `login-per-email` | 10 / 15m | same |
 | `register-per-ip` | 10 / 1h | `POST /api/v1/auth/register` |
-| `register-per-email` | 3 / 1h | same |
+| `register-per-email` | 8 / 1h (every attempt counts, including a 409 for a taken username) | same |
 | `verification-email-per-ip` | 3 / 15m | `POST /api/v1/auth/verification-email` |
 | `verification-email-per-email` | 5 / 24h | same |
 
@@ -26,12 +26,17 @@ adding one line to `/etc/musicboxd/api.env`, then recreating the api. These poli
 environment variable cannot name a map key with a dash (`..._LOGINPEREMAIL_...` would create a new, unused policy
 `loginperemail`), so use `SPRING_APPLICATION_JSON`, unquoted, with every override in that one line:
 `SPRING_APPLICATION_JSON={"musicboxd":{"rate-limit":{"policies":{"login-per-email":{"capacity":20,"refill-period":"15m"}}}}}`
-Check it took effect: `sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml exec api env | grep SPRING_APPLICATION_JSON`. **[host]**
-`cd /opt/musicboxd && sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d api`
+Recreate the api: **[host]** `cd /opt/musicboxd && sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml up -d api`
+Then check the new container has it: **[host]** `sudo docker compose --env-file /etc/musicboxd/stack.env -f docker-compose.prod.yml exec api env | grep SPRING_APPLICATION_JSON`.
+That only proves the variable is set; to prove the limit changed, rerun the matching Verification step below with the new count.
 State is in memory: a restart or deploy refills every bucket.
 
-Known trade-off: anyone who knows an address can keep its login throttled. After they stop, the owner waits at
-most 90 s. If this is abused, raise `login-per-email` first.
+Known trade-off: anyone who knows an address can keep its login throttled, and its verification-email resend too.
+Holding a login locked costs them one request per `refill-period / capacity` (every 90 s at 10 per 15m); after
+they stop, the owner waits at most that long. Raising the capacity does **not** fix this, it only makes the
+attacker send more often. Holding resend locked denies the owner a new link, but each of the attacker's resends
+already mails a fresh link to the owner's inbox. If either is abused, the fix is code, not tuning: exempt a
+caller that already holds a session for the account, or add a bucket keyed on email + IP.
 
 ## Verification
 
@@ -43,9 +48,10 @@ sections, or run them from different networks.
   `for i in $(seq 11); do curl -sS -o /dev/null -w "%{http_code} " -H 'Content-Type: application/json' -d '{"email":"<EMAIL>","password":"wrong-password"}' https://musicboxd.com.br/api/v1/auth/login; done; echo`
   Expected: ten `401` then `429`. Then the right password also gets `429` with a `Retry-After` header:
   `curl -sS -i -H 'Content-Type: application/json' -d '{"email":"<EMAIL>","password":"<PASSWORD>"}' https://musicboxd.com.br/api/v1/auth/login | grep -iE '^HTTP|^retry-after'`
-- [ ] **Registration.** **[local]** Send 4 sign-ups for a new `<EMAIL2>`, each with a fresh username:
-  `for i in $(seq 4); do curl -sS -o /dev/null -w "%{http_code} " -H 'Content-Type: application/json' -d "{\"email\":\"<EMAIL2>\",\"password\":\"correct-horse\",\"username\":\"rl_test_$i\"}" https://musicboxd.com.br/api/v1/auth/register; done; echo`
-  Expected: `201 409 409 429`. Exactly one verification email arrives at `<EMAIL2>`.
+- [ ] **Registration.** **[local]** Send 9 sign-ups for a new `<EMAIL2>`, each with a fresh username:
+  `for i in $(seq 9); do curl -sS -o /dev/null -w "%{http_code} " -H 'Content-Type: application/json' -d "{\"email\":\"<EMAIL2>\",\"password\":\"correct-horse\",\"username\":\"rl_test_$i\"}" https://musicboxd.com.br/api/v1/auth/register; done; echo`
+  Expected: `201`, seven `409`, then `429` (9 stays under `register-per-ip`'s 10, so the 429 is the per-email
+  limit). Exactly one verification email arrives at `<EMAIL2>`.
 - [ ] **Verification email.** **[local]** For the unverified `<EMAIL2>`, send 6 resends, one every 5 minutes so the per-IP
   limit (3 / 15m) never trips:
   `curl -sS -o /dev/null -w "%{http_code}\n" -H 'Content-Type: application/json' -d '{"email":"<EMAIL2>"}' https://musicboxd.com.br/api/v1/auth/verification-email`

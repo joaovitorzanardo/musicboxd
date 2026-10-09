@@ -14,6 +14,8 @@
 
 ## Decisions (defaults chosen for this story)
 
+> **2026-10-09, after the final review:** `register-per-email` was raised from 3 to 8 per hour. Every attempt costs a token, including a 409 for a taken username, so 3 locked a real person out of sign-up after a few username tries (`AuthFlowTest.tryingSeveralTakenUsernamesDoesNotLockTheEmailOutOfSignUp`). The runbook now says tuning cannot fix the targeted lockout, and it recreates the api before checking the override.
+
 | Question | Decision |
 |---|---|
 | What "per user" means on anonymous endpoints | The **email address in the request body**, normalized exactly as `AccountService.normalize` does (strip + lowercase). It is the same key whether the account exists or not. |
