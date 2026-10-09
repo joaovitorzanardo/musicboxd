@@ -159,6 +159,39 @@ class AuthRateLimitTest {
 			.andExpect(jsonPath("$.paths['/api/v1/auth/register'].post.responses['429']").exists());
 	}
 
+	// --- verification email ---
+
+	@Test
+	void verificationEmailIsThrottledPerEmailWhicheverIp() throws Exception {
+		String email = uniqueEmail();
+		register(email, uniqueUsername(), freshIp()).andExpect(status().isCreated()); // first email
+
+		resend(email, freshIp()).andExpect(status().isAccepted());
+		resend(email, freshIp()).andExpect(status().isAccepted());
+		resend(email, freshIp())
+			.andExpect(status().isTooManyRequests())
+			.andExpect(header().exists("Retry-After"));
+
+		assertThat(mail.sentTo(email)).hasSize(3);
+	}
+
+	@Test
+	void verificationEmailThrottleDoesNotRevealWhetherTheAccountExists() throws Exception {
+		String nobody = uniqueEmail();
+		resend(nobody, freshIp()).andExpect(status().isAccepted());
+		resend(nobody, freshIp()).andExpect(status().isAccepted());
+		resend(nobody, freshIp()).andExpect(status().isTooManyRequests());
+	}
+
+	@Test
+	void verificationEmailIsStillThrottledPerIp() throws Exception {
+		String ip = freshIp();
+		for (int i = 0; i < 10; i++) {
+			resend(uniqueEmail(), ip).andExpect(status().isAccepted());
+		}
+		resend(uniqueEmail(), ip).andExpect(status().isTooManyRequests());
+	}
+
 	// --- helpers ---
 
 	/** A client IP no other request in this class has used, so only the bucket under test fills up. */

@@ -146,11 +146,14 @@ public class AuthController {
 
 	@PostMapping("/verification-email")
 	@ResponseStatus(HttpStatus.ACCEPTED)
-	@RateLimited(policy = "verification-email")
+	@RateLimited(policy = "verification-email-per-ip")
 	@ApiResponse(responseCode = "202", description = "If an unverified account has this email, a new link was sent")
 	@ApiResponse(responseCode = "400", description = "Invalid email")
-	@ApiResponse(responseCode = "429", description = "Too many requests from this caller; see Retry-After")
+	@ApiResponse(responseCode = "429",
+			description = "Too many requests for this email or from this caller (same answer whether or not the account exists); see Retry-After")
 	public void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+		// Keyed on the address, not the account, so known and unknown emails are throttled alike.
+		rateLimits.check("verification-email-per-email", EmailRateLimitKey.of(request.email()));
 		verifications.resend(request.email());
 	}
 
