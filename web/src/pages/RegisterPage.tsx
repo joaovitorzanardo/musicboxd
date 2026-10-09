@@ -7,7 +7,7 @@ import { PasswordField, TextField } from '../ui/Field';
 
 type Input = { username: string; email: string; password: string };
 type FieldErrors = Partial<Record<keyof Input, ReactNode>>;
-type Failure = 'rejected' | 'unavailable' | null;
+type Failure = 'rejected' | 'rate-limited' | 'unavailable' | null;
 
 // Same rules as AuthController.RegisterRequest; the server stays the authority (AD-7).
 const USERNAME = /^[A-Za-z0-9_]{3,20}$/;
@@ -60,7 +60,13 @@ export function RegisterPage() {
       } else if (error instanceof ApiError && error.type === PROBLEM_TYPES.usernameTaken) {
         setErrors({ username: 'Este nome de usuário já está em uso.' });
       } else {
-        setFailure(error instanceof ApiError && error.status === 400 ? 'rejected' : 'unavailable');
+        if (error instanceof ApiError && error.status === 400) {
+          setFailure('rejected');
+        } else if (error instanceof ApiError && error.status === 429) {
+          setFailure('rate-limited');
+        } else {
+          setFailure('unavailable');
+        }
       }
     } finally {
       setSubmitting(false);
@@ -73,6 +79,9 @@ export function RegisterPage() {
       <p className="auth-lead">Só precisa de um nome de usuário, email e senha.</p>
       {Object.keys(errors).length > 0 && <Alert title="Não foi possível criar a conta.">Corrija os campos destacados.</Alert>}
       {failure === 'rejected' && <Alert title="Não foi possível criar a conta.">Confira os dados e tente de novo.</Alert>}
+      {failure === 'rate-limited' && (
+        <Alert title="Muitas tentativas de cadastro.">Espere alguns minutos e tente de novo.</Alert>
+      )}
       {failure === 'unavailable' && <Alert title="Não foi possível criar a conta agora.">Tente de novo em instantes.</Alert>}
       <form className="auth-form" noValidate onSubmit={(event) => void handleSubmit(event)}>
         <TextField

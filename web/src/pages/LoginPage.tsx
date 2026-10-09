@@ -7,7 +7,7 @@ import { Alert } from '../ui/Alert';
 import { AuthLayout } from '../ui/AuthLayout';
 import { PasswordField, TextField } from '../ui/Field';
 
-type Failure = 'credentials' | 'unavailable' | null;
+type Failure = 'credentials' | 'rate-limited' | 'unavailable' | null;
 
 export function LoginPage() {
   const { signIn } = useAuth();
@@ -37,7 +37,13 @@ export function LoginPage() {
         navigate('/verifique-email', { state: { email: email.trim() } });
         return;
       }
-      setFailure(error instanceof ApiError && error.status === 401 ? 'credentials' : 'unavailable');
+      if (error instanceof ApiError && error.status === 401) {
+        setFailure('credentials');
+      } else if (error instanceof ApiError && error.status === 429) {
+        setFailure('rate-limited');
+      } else {
+        setFailure('unavailable');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -48,6 +54,7 @@ export function LoginPage() {
       <h1 id="login-title">Entrar</h1>
       <p className="auth-lead">Bem-vindo de volta ao musicboxd.</p>
       {failure === 'credentials' && <Alert title="Email ou senha incorretos.">Confira os dados e tente de novo.</Alert>}
+      {failure === 'rate-limited' && <Alert title="Muitas tentativas.">Espere alguns minutos e tente de novo.</Alert>}
       {failure === 'unavailable' && <Alert title="Não foi possível entrar agora.">Tente de novo em instantes.</Alert>}
       <form className="auth-form" noValidate onSubmit={(event) => void handleSubmit(event)}>
         <TextField

@@ -46,6 +46,16 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('asks to wait on a 429 instead of blaming the credentials', async () => {
+    fakeApi({ 'POST /api/v1/auth/refresh': () => problem(401), 'POST /api/v1/auth/login': () => problem(429) });
+    renderApp('/entrar');
+
+    await fillAndSubmit('ana@exemplo.com', 'correct-horse');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Muitas tentativas. Espere alguns minutos e tente de novo.');
+    expect(screen.getByLabelText('Email')).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('sends an unverified account to "Verifique seu email" with its address', async () => {
     fakeApi({
       'POST /api/v1/auth/refresh': () => problem(401),
