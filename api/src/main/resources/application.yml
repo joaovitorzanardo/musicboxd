@@ -41,6 +41,13 @@ musicboxd:
       login-per-email:
         capacity: 10
         refill-period: 15m
+      # Every sign-up sends a verification email (SES cost), so per-IP is the tight one.
+      register-per-ip:
+        capacity: 10
+        refill-period: 1h
+      register-per-email:
+        capacity: 3
+        refill-period: 1h
       # MBD-18 resend: unauthenticated, so keyed per client IP. MBD-23 adds per-email limits.
       verification-email:
         capacity: 3

@@ -82,10 +82,14 @@ public class AuthController {
 
 	@PostMapping("/register")
 	@ResponseStatus(HttpStatus.CREATED)
+	@RateLimited(policy = "register-per-ip")
 	@ApiResponse(responseCode = "201", description = "Account and profile created")
 	@ApiResponse(responseCode = "400", description = "Invalid email, password or username")
 	@ApiResponse(responseCode = "409", description = "Email or username already taken (type urn:musicboxd:problem:email-taken or urn:musicboxd:problem:username-taken)")
+	@ApiResponse(responseCode = "429", description = "Too many sign-ups for this email or from this caller; see Retry-After")
 	public AccountView register(@Valid @RequestBody RegisterRequest request) {
+		// Before anything is written: a throttled sign-up creates no account and sends no email.
+		rateLimits.check("register-per-email", EmailRateLimitKey.of(request.email()));
 		return accounts.register(request.email(), request.password(), request.username());
 	}
 

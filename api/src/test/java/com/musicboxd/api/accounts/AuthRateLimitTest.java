@@ -3,6 +3,7 @@ package com.musicboxd.api.accounts;
 import static com.musicboxd.api.accounts.AccountServiceTest.markVerified;
 import static com.musicboxd.api.accounts.AccountServiceTest.uniqueEmail;
 import static com.musicboxd.api.accounts.AccountServiceTest.uniqueUsername;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -119,6 +120,43 @@ class AuthRateLimitTest {
 	void openApiDocumentsTheLoginThrottle() throws Exception {
 		mockMvc.perform(get("/api/v1/api-docs"))
 			.andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.responses['429']").exists());
+	}
+
+	// --- registration ---
+
+	@Test
+	void registrationIsThrottledPerEmail() throws Exception {
+		String email = uniqueEmail();
+		register(email, uniqueUsername(), freshIp()).andExpect(status().isCreated());
+		register(email, uniqueUsername(), freshIp()).andExpect(status().isConflict());
+
+		register(email, uniqueUsername(), freshIp())
+			.andExpect(status().isTooManyRequests())
+			.andExpect(header().exists("Retry-After"));
+	}
+
+	@Test
+	void registrationIsThrottledPerIpAndAThrottledOneCreatesNothing() throws Exception {
+		String ip = freshIp();
+		for (int i = 0; i < 3; i++) {
+			register(uniqueEmail(), uniqueUsername(), ip).andExpect(status().isCreated());
+		}
+
+		String fourth = uniqueEmail();
+		register(fourth, uniqueUsername(), ip).andExpect(status().isTooManyRequests());
+
+		assertThat(mail.sentTo(fourth)).isEmpty();
+		assertThat(jdbc.sql("SELECT count(*) FROM accounts.accounts WHERE email = :email")
+			.param("email", fourth)
+			.query(Long.class)
+			.single()).isZero();
+		register(uniqueEmail(), uniqueUsername(), freshIp()).andExpect(status().isCreated());
+	}
+
+	@Test
+	void openApiDocumentsTheRegistrationThrottle() throws Exception {
+		mockMvc.perform(get("/api/v1/api-docs"))
+			.andExpect(jsonPath("$.paths['/api/v1/auth/register'].post.responses['429']").exists());
 	}
 
 	// --- helpers ---
