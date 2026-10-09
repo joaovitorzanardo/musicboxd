@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiError, verifyEmail } from '../auth/authApi';
-import { Alert } from '../ui/Alert';
 import { AuthLayout } from '../ui/AuthLayout';
 import { CheckIcon, WarningIcon } from '../ui/icons';
 
@@ -38,25 +37,29 @@ export function VerifyEmailPage() {
 
   // Layout effect: the heading has focus in the same commit that shows it, so it is announced at once.
   useLayoutEffect(() => {
-    if (outcome === 'verified' || outcome === 'invalid') {
+    if (outcome !== 'checking') {
       headingRef.current?.focus();
     }
   }, [outcome]);
 
-  if (outcome === 'checking' || outcome === 'unavailable') {
+  if (outcome === 'checking') {
     return (
       <AuthLayout titleId="confirm-title" centered>
-        <h1 id="confirm-title" role="status">
-          Confirmando seu email…
+        <h1 id="confirm-title">Confirmando seu email…</h1>
+      </AuthLayout>
+    );
+  }
+
+  if (outcome === 'unavailable') {
+    return (
+      <AuthLayout titleId="confirm-title" centered>
+        <h1 id="confirm-title" tabIndex={-1} ref={headingRef}>
+          Não foi possível confirmar agora
         </h1>
-        {outcome === 'unavailable' && (
-          <>
-            <Alert title="Não foi possível confirmar agora.">Tente de novo em instantes.</Alert>
-            <button className="btn btn--full" type="button" onClick={() => setAttempt((n) => n + 1)}>
-              Tentar de novo
-            </button>
-          </>
-        )}
+        <p className="auth-lead">Tente de novo em instantes.</p>
+        <button className="btn btn--full" type="button" onClick={() => setAttempt((n) => n + 1)}>
+          Tentar de novo
+        </button>
       </AuthLayout>
     );
   }

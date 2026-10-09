@@ -56,11 +56,20 @@ describe('VerifyEmailPage', () => {
     expect(calls.some((c) => c.url.startsWith('/api/v1/auth/verify'))).toBe(false);
   });
 
-  it('does not call a working link invalid when the API is unreachable', async () => {
-    fakeApi({ ...SIGNED_OUT, 'GET /api/v1/auth/verify': () => problem(503) });
+  it('keeps "Confirmando seu email…" a heading while the request is in flight', async () => {
+    fakeApi({ ...SIGNED_OUT, 'GET /api/v1/auth/verify': () => new Promise<Response>(() => {}) });
     renderApp('/verificar-email?token=abc');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível confirmar agora. Tente de novo em instantes.');
+    expect(await screen.findByRole('heading', { name: 'Confirmando seu email…' })).toBeInTheDocument();
+  });
+
+  it.each([429, 502, 503])('does not call a working link invalid when the API answers %i', async (status) => {
+    fakeApi({ ...SIGNED_OUT, 'GET /api/v1/auth/verify': () => problem(status) });
+    renderApp('/verificar-email?token=abc');
+
+    const heading = await screen.findByRole('heading', { name: 'Não foi possível confirmar agora' });
+    expect(screen.getByText('Tente de novo em instantes.')).toBeInTheDocument();
+    expect(heading).toHaveFocus();
     expect(screen.queryByRole('heading', { name: 'Link inválido ou expirado' })).toBeNull();
   });
 

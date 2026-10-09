@@ -241,8 +241,9 @@ curl -s -w '\n%{http_code}\n' -X POST $D/api/v1/auth/login -H 'Content-Type: app
   -d "{\"email\":\"$E\",\"password\":\"correct-horse\"}"                                    # 403, "Email not verified"
 ```
 
-Open the email **"Confirme seu email no Musicboxd"** (check Spam) and click the link. The browser shows
-`{"status":"verified"}`. Then:
+Open the email **"Confirme seu email no Musicboxd"** (check Spam) and click the link. It opens the app page
+`/verificar-email`, which shows **"Tudo certo!"** with an **Entrar** button (MBD-63). For the raw API answer instead,
+`curl -s "$D/api/v1/auth/verify?token=<token from the link>"` returns `{"status":"verified"}`. Then:
 
 ```bash
 curl -s -w '\n%{http_code}\n' -X POST $D/api/v1/auth/login -H 'Content-Type: application/json' \
@@ -288,9 +289,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST $D/api/v1/auth/register -H 'Con
 
 6. **Resend** → 202, and a **second** email arrives:
    `curl -s -o /dev/null -w '%{http_code}\n' -X POST $D/api/v1/auth/verification-email -H 'Content-Type: application/json' -d "{\"email\":\"$E\"}"`.
-   Click the link in the **first** email: it must fail with **400** "invalid or expired" (resend replaced
-   it). Click the link in the **second** email: `{"status":"verified"}`. Click it again:
-   `{"status":"verified"}` (idempotent, so mail scanners that pre-open links do not break it). Login now → 200.
+   Click the link in the **first** email: the page must show **"Link inválido ou expirado"** (the API answers
+   400; resend replaced it). Click the link in the **second** email: **"Tudo certo!"**. Click it again:
+   **"Tudo certo!"** (idempotent, so mail scanners that pre-open links do not break it). Login now → 200.
 7. **Pre-MBD-18 accounts were not locked out**: the MBD-17 smoke account (`smoke+1@example.com`) still
    logs in with 200. The V2 migration marks every existing account as verified.
 
