@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, PROBLEM_TYPES, login, register } from './authApi';
+import { ApiError, PROBLEM_TYPES, login, register, verifyEmail } from './authApi';
 import { startSession } from './session';
 import { authHeader, fakeApi, json, problem } from '../test/fakeApi';
 
@@ -40,5 +40,32 @@ describe('authApi', () => {
 
     expect((error as ApiError).status).toBe(502);
     expect((error as ApiError).type).toBeUndefined();
+  });
+  it('verifyEmail sends the token to the verify endpoint without a bearer token', async () => {
+    startSession({ accessToken: 'a1', tokenType: 'Bearer', expiresIn: 900 });
+    const { calls } = fakeApi({ 'GET /api/v1/auth/verify': () => json(200, { status: 'verified' }) });
+
+    await verifyEmail('abc_DEF-123');
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('GET');
+    expect(calls[0].url).toBe('/api/v1/auth/verify?token=abc_DEF-123');
+    expect(authHeader(calls[0])).toBeNull();
+  });
+
+  it('verifyEmail encodes the token as a single query value', async () => {
+    const { calls } = fakeApi({ 'GET /api/v1/auth/verify': () => json(200, { status: 'verified' }) });
+
+    await verifyEmail('a&b=c #d+e');
+
+    const sent = new URLSearchParams(calls[0].url.split('?')[1]);
+    expect([...sent.keys()]).toEqual(['token']);
+    expect(sent.get('token')).toBe('a&b=c #d+e');
+  });
+
+  it('verifyEmail rejects with a 400 ApiError for an invalid or expired link', async () => {
+    fakeApi({ 'GET /api/v1/auth/verify': () => problem(400) });
+
+    await expect(verifyEmail('expired')).rejects.toMatchObject({ name: 'ApiError', status: 400 });
   });
 });

@@ -4,8 +4,9 @@ export type Call = { method: string; url: string; init: RequestInit };
 type Handler = (call: Call) => Response | Promise<Response>;
 
 /**
- * Stubs global fetch with a route table keyed "METHOD /path". An array of handlers answers in order
- * and repeats its last entry. Unknown routes reject, so an unexpected call fails the test loudly.
+ * Stubs global fetch with a route table keyed "METHOD /path" (the query string is ignored for matching;
+ * `call.url` keeps it). An array of handlers answers in order and repeats its last entry.
+ * Unknown routes reject, so an unexpected call fails the test loudly.
  */
 export function fakeApi(routes: Record<string, Handler | Handler[]>) {
   const calls: Call[] = [];
@@ -16,7 +17,7 @@ export function fakeApi(routes: Record<string, Handler | Handler[]>) {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : new URL(input.url).pathname;
       const call = { method: (init.method ?? 'GET').toUpperCase(), url, init };
       calls.push(call);
-      const queue = queues.get(`${call.method} ${call.url}`);
+      const queue = queues.get(`${call.method} ${url.split('?')[0]}`);
       if (!queue) {
         throw new Error(`Unexpected request ${call.method} ${call.url}`);
       }
