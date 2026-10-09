@@ -20,7 +20,7 @@ Values: domain `musicboxd.com.br`, stack at `/opt/musicboxd`, env file `/etc/mus
 | nginx per-IP rate | `rate=10r/s` (zone `perip`, 10 MB of state) | `limit_req_zone` in `deploy/nginx/nginx.conf` and `deploy/nginx/nginx.prod.conf.template` |
 | nginx per-IP burst | `burst=30 nodelay`, rejected with `429` | `limit_req` in the same two files (prod: 443 server only; port 80 only redirects and serves ACME) |
 | Request body cap | `client_max_body_size 1m`, rejected with `413` | same two files |
-| Spring per-user policies | `demo`: 5 requests per `1m` | `musicboxd.rate-limit.policies.*` in `api/src/main/resources/application.yml` |
+| Spring per-user policies | `demo`: 5 requests per `1m`; auth policies (login, register, verification email): see `runbook-mbd-23-auth-rate-limits.md` | `musicboxd.rate-limit.policies.*` in `api/src/main/resources/application.yml` |
 | Spring tracked keys | 10 000 buckets per policy (Bucket4j buckets in a Caffeine cache); idle ones expire after a refill period, and when full Caffeine evicts rather than rejecting | `MAX_TRACKED_KEYS` in `RateLimitConfig` |
 
 Keep the two nginx files in sync; `deploy/tests/test-nginx-conf.sh` checks the prod template has the directives.

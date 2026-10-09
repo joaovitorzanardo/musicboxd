@@ -88,6 +88,17 @@ describe('RegisterPage', () => {
     expect(screen.getByLabelText('Nome de usuário')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('asks to wait on a 429', async () => {
+    fakeApi({ 'POST /api/v1/auth/refresh': () => problem(401), 'POST /api/v1/auth/register': () => problem(429) });
+    renderApp('/cadastro');
+
+    await fill('ana_silva', 'ana@exemplo.com', 'correct-horse');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Muitas tentativas de cadastro. Espere alguns minutos e tente de novo.',
+    );
+  });
+
   it('prefills username and email when coming back to fix them', async () => {
     fakeApi({ 'POST /api/v1/auth/refresh': () => problem(401) });
     renderApp({ pathname: '/cadastro', state: { email: 'ana@exemplo.com', username: 'ana_silva' } });

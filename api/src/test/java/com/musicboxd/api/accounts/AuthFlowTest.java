@@ -186,6 +186,21 @@ class AuthFlowTest {
 			.andExpect(jsonPath("$.type").value("urn:musicboxd:problem:username-taken"));
 	}
 
+	/** MBD-23: the real per-email sign-up limit leaves room to try a few taken usernames. */
+	@Test
+	void tryingSeveralTakenUsernamesDoesNotLockTheEmailOutOfSignUp() throws Exception {
+		String email = uniqueEmail();
+		for (int i = 0; i < 4; i++) {
+			String taken = uniqueUsername();
+			register(uniqueEmail(), PASSWORD, taken).andExpect(status().isCreated());
+			register(email, PASSWORD, taken)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.type").value("urn:musicboxd:problem:username-taken"));
+		}
+
+		register(email, PASSWORD, uniqueUsername()).andExpect(status().isCreated());
+	}
+
 	@Test
 	void unverifiedAccountCannotLogInUntilTheEmailedLinkIsVisited() throws Exception {
 		String email = uniqueEmail();

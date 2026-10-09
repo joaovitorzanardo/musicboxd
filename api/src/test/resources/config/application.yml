@@ -7,6 +7,14 @@ spring:
         # Tests never call AWS: MailConfig's LoggingMailSender, or MailTestConfiguration's recorder.
         enabled: false
 musicboxd:
+  rate-limit:
+    policies:
+      # Every MockMvc request comes from 127.0.0.1 and the context is shared across test classes,
+      # so per-IP auth limits would trip on unrelated tests. AuthRateLimitTest sets its own numbers.
+      login-per-ip:
+        capacity: 100000
+      register-per-ip:
+        capacity: 100000
   auth:
     # Base64 of "test-only-jwt-secret-not-for-prod-use!!" (39 bytes).
     jwt-secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQtbm90LWZvci1wcm9kLXVzZSEh

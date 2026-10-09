@@ -11,11 +11,11 @@ import jakarta.servlet.http.HttpServletResponse;
 /** Enforces {@link RateLimited} on the matched handler method, or its controller class. */
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-	private final RateLimiter limiter;
+	private final RateLimits rateLimits;
 	private final BeanFactory beans;
 
-	public RateLimitInterceptor(RateLimiter limiter, BeanFactory beans) {
-		this.limiter = limiter;
+	public RateLimitInterceptor(RateLimits rateLimits, BeanFactory beans) {
+		this.rateLimits = rateLimits;
 		this.beans = beans;
 	}
 
@@ -33,10 +33,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 		}
 
 		String key = beans.getBean(limit.keyResolver(), RateLimitKeyResolver.class).resolve(request);
-		var decision = limiter.tryAcquire(limit.policy(), key);
-		if (!decision.allowed()) {
-			throw new RateLimitExceededException(decision.retryAfter());
-		}
+		rateLimits.check(limit.policy(), key);
 		return true;
 	}
 }

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.musicboxd.api.ratelimit.RateLimited;
+import com.musicboxd.api.ratelimit.RateLimits;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -67,32 +68,43 @@ public class AuthController {
 	private final RefreshTokenService refreshTokens;
 	private final RefreshTokenProperties refreshProps;
 	private final EmailVerificationService verifications;
+	private final RateLimits rateLimits;
 
 	AuthController(AccountService accounts, TokenService tokens, RefreshTokenService refreshTokens,
-			RefreshTokenProperties refreshProps, EmailVerificationService verifications) {
+			RefreshTokenProperties refreshProps, EmailVerificationService verifications, RateLimits rateLimits) {
 		this.accounts = accounts;
 		this.tokens = tokens;
 		this.refreshTokens = refreshTokens;
 		this.refreshProps = refreshProps;
 		this.verifications = verifications;
+		this.rateLimits = rateLimits;
 	}
 
 	@PostMapping("/register")
 	@ResponseStatus(HttpStatus.CREATED)
+	@RateLimited(policy = "register-per-ip")
 	@ApiResponse(responseCode = "201", description = "Account and profile created")
 	@ApiResponse(responseCode = "400", description = "Invalid email, password or username")
 	@ApiResponse(responseCode = "409", description = "Email or username already taken (type urn:musicboxd:problem:email-taken or urn:musicboxd:problem:username-taken)")
+	@ApiResponse(responseCode = "429", description = "Too many sign-ups for this email or from this caller; see Retry-After")
 	public AccountView register(@Valid @RequestBody RegisterRequest request) {
+		// Before anything is written: a throttled sign-up creates no account and sends no email.
+		rateLimits.check("register-per-email", EmailRateLimitKey.of(request.email()));
 		return accounts.register(request.email(), request.password(), request.username());
 	}
 
 	@PostMapping("/login")
+	@RateLimited(policy = "login-per-ip")
 	@ApiResponse(responseCode = "200",
 			description = "A short-lived bearer access token; the refresh token is set as an HttpOnly cookie")
 	@ApiResponse(responseCode = "401", description = "Unknown email or wrong password (indistinguishable)")
 	@ApiResponse(responseCode = "403",
 			description = "Right password, email not verified yet (type urn:musicboxd:problem:email-not-verified)")
+	@ApiResponse(responseCode = "429",
+			description = "Too many attempts for this email or from this caller, right password or not; see Retry-After")
 	public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+		// Before the password check: a throttled attempt never reaches bcrypt and learns nothing.
+		rateLimits.check("login-per-email", EmailRateLimitKey.of(request.email()));
 		UUID accountId = accounts.authenticate(request.email(), request.password());
 		return withSession(accountId, refreshTokens.issue(accountId));
 	}
@@ -134,11 +146,14 @@ public class AuthController {
 
 	@PostMapping("/verification-email")
 	@ResponseStatus(HttpStatus.ACCEPTED)
-	@RateLimited(policy = "verification-email")
+	@RateLimited(policy = "verification-email-per-ip")
 	@ApiResponse(responseCode = "202", description = "If an unverified account has this email, a new link was sent")
 	@ApiResponse(responseCode = "400", description = "Invalid email")
-	@ApiResponse(responseCode = "429", description = "Too many requests from this caller; see Retry-After")
+	@ApiResponse(responseCode = "429",
+			description = "Too many requests for this email or from this caller (same answer whether or not the account exists); see Retry-After")
 	public void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+		// Keyed on the address, not the account, so known and unknown emails are throttled alike.
+		rateLimits.check("verification-email-per-email", EmailRateLimitKey.of(request.email()));
 		verifications.resend(request.email());
 	}
 
