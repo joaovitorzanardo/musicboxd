@@ -33,6 +33,14 @@ musicboxd:
       demo:
         capacity: 5
         refill-period: 1m
+      # MBD-23 (AD-10): anonymous auth endpoints are limited twice. *-per-email counts one account
+      # (the email in the body, whichever IP sends it); *-per-ip stops one caller cycling emails.
+      login-per-ip:
+        capacity: 20
+        refill-period: 15m
+      login-per-email:
+        capacity: 10
+        refill-period: 15m
       # MBD-18 resend: unauthenticated, so keyed per client IP. MBD-23 adds per-email limits.
       verification-email:
         capacity: 3

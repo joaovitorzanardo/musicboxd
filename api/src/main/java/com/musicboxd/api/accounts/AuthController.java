@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.musicboxd.api.ratelimit.RateLimited;
+import com.musicboxd.api.ratelimit.RateLimits;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
@@ -67,14 +68,16 @@ public class AuthController {
 	private final RefreshTokenService refreshTokens;
 	private final RefreshTokenProperties refreshProps;
 	private final EmailVerificationService verifications;
+	private final RateLimits rateLimits;
 
 	AuthController(AccountService accounts, TokenService tokens, RefreshTokenService refreshTokens,
-			RefreshTokenProperties refreshProps, EmailVerificationService verifications) {
+			RefreshTokenProperties refreshProps, EmailVerificationService verifications, RateLimits rateLimits) {
 		this.accounts = accounts;
 		this.tokens = tokens;
 		this.refreshTokens = refreshTokens;
 		this.refreshProps = refreshProps;
 		this.verifications = verifications;
+		this.rateLimits = rateLimits;
 	}
 
 	@PostMapping("/register")
@@ -87,12 +90,17 @@ public class AuthController {
 	}
 
 	@PostMapping("/login")
+	@RateLimited(policy = "login-per-ip")
 	@ApiResponse(responseCode = "200",
 			description = "A short-lived bearer access token; the refresh token is set as an HttpOnly cookie")
 	@ApiResponse(responseCode = "401", description = "Unknown email or wrong password (indistinguishable)")
 	@ApiResponse(responseCode = "403",
 			description = "Right password, email not verified yet (type urn:musicboxd:problem:email-not-verified)")
+	@ApiResponse(responseCode = "429",
+			description = "Too many attempts for this email or from this caller, right password or not; see Retry-After")
 	public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+		// Before the password check: a throttled attempt never reaches bcrypt and learns nothing.
+		rateLimits.check("login-per-email", EmailRateLimitKey.of(request.email()));
 		UUID accountId = accounts.authenticate(request.email(), request.password());
 		return withSession(accountId, refreshTokens.issue(accountId));
 	}
