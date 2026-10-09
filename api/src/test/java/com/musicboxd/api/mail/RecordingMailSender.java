@@ -13,7 +13,7 @@ import org.springframework.mail.SimpleMailMessage;
 /** Captures sent emails; {@link #failing(boolean)} simulates an SES outage. */
 public class RecordingMailSender implements MailSender {
 
-	private static final Pattern LINK = Pattern.compile("https?://\\S+/api/v1/auth/verify\\?token=[A-Za-z0-9_-]+");
+	private static final Pattern LINK = Pattern.compile("https?://\\S+/verificar-email\\?token=[A-Za-z0-9_-]+");
 
 	private final List<SimpleMailMessage> sent = new CopyOnWriteArrayList<>();
 	private volatile boolean failing;

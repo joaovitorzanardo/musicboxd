@@ -26,3 +26,21 @@ export function MailIcon() {
     </svg>
   );
 }
+
+export function CheckIcon() {
+  return (
+    <svg {...base} width={30} height={30}>
+      <path d="M5 12.5 10 17.5 19 7" />
+    </svg>
+  );
+}
+
+export function WarningIcon() {
+  return (
+    <svg {...base} width={30} height={30}>
+      <path d="M12 9v5" />
+      <path d="M12 4 2.8 19.5h18.4z" />
+      <circle cx="12" cy="17" r=".6" fill="currentColor" />
+    </svg>
+  );
+}

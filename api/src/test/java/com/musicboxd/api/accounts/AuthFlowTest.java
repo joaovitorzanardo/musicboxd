@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -248,8 +247,9 @@ class AuthFlowTest {
 		resend("not-an-email-at-all".repeat(20), "203.0.113.9").andExpect(status().isBadRequest());
 	}
 
+	/** What the SPA page the link opens does (MBD-63): send the link's token to the verify endpoint. */
 	private void verifyViaEmailedLink(String email) throws Exception {
-		mockMvc.perform(get(URI.create(mail.verificationLink(email))))
+		mockMvc.perform(get("/api/v1/auth/verify").queryParam("token", RecordingMailSender.token(mail.verificationLink(email))))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("verified"));
 	}

@@ -13,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.net.URI;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -211,7 +210,8 @@ class RefreshFlowTest {
 			.content("""
 				{"email":"%s","password":"%s","username":"%s"}""".formatted(email, PASSWORD, uniqueUsername())))
 			.andExpect(status().isCreated());
-		mockMvc.perform(get(URI.create(mail.verificationLink(email)))).andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/auth/verify").queryParam("token", RecordingMailSender.token(mail.verificationLink(email))))
+			.andExpect(status().isOk());
 		return email;
 	}
 

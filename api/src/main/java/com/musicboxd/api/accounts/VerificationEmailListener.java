@@ -32,8 +32,9 @@ class VerificationEmailListener {
 
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	void send(VerificationEmailRequested event) {
+		// The SPA page (MBD-63) calls GET /api/v1/auth/verify and shows the outcome.
 		URI link = UriComponentsBuilder.fromUri(props.linkBaseUrl())
-			.path("/api/v1/auth/verify")
+			.path("/verificar-email")
 			.queryParam("token", event.rawToken())
 			.build()
 			.toUri();

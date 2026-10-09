@@ -192,6 +192,16 @@
   margin: 0 auto 14px;
 }
 
+.auth-mail--bad {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+/* A heading focused from code (so screen readers announce it) is not a control: no focus ring. */
+.auth-card h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 .btn {
   background: var(--coral);
   color: var(--on-coral);
@@ -242,6 +252,14 @@
   color: var(--fg);
   font-weight: 600;
   text-underline-offset: 3px;
+}
+
+/* A router <Link> that looks like the primary button (MBD-63 "Entrar"). */
+.auth-card a.btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: var(--on-coral);
 }
 
 .auth-alt a:hover {

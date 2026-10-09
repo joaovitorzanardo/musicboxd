@@ -51,6 +51,11 @@ export async function resendVerificationEmail(email: string): Promise<void> {
   );
 }
 
+/** The emailed link's token. 200 also when the link was already used; 400 when unknown, replaced or expired. */
+export async function verifyEmail(token: string): Promise<void> {
+  await expectOk(await apiFetch(`/api/v1/auth/verify?${new URLSearchParams({ token })}`, { anonymous: true }));
+}
+
 export async function fetchMe(): Promise<Account> {
   const response = await expectOk(await apiFetch('/api/v1/accounts/me'));
   return (await response.json()) as Account;

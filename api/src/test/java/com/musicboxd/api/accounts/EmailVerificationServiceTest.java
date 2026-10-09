@@ -69,7 +69,7 @@ class EmailVerificationServiceTest {
 		assertThat(sent.getFrom()).isEqualTo("no-reply@test.invalid");
 		assertThat(sent.getSubject()).isEqualTo("Confirme seu email no Musicboxd");
 		assertThat(sent.getText()).contains("24 horas");
-		assertThat(mail.verificationLink(email)).startsWith("http://localhost/api/v1/auth/verify?token=");
+		assertThat(mail.verificationLink(email)).startsWith("http://localhost/verificar-email?token=");
 	}
 
 	@Test
@@ -238,7 +238,7 @@ class EmailVerificationServiceTest {
 
 		new VerificationEmailListener(mail, props).send(new VerificationEmailRequested(UUID.randomUUID(), email, "abc_DEF-123"));
 
-		assertThat(mail.verificationLink(email)).isEqualTo("https://musicboxd.com.br/api/v1/auth/verify?token=abc_DEF-123");
+		assertThat(mail.verificationLink(email)).isEqualTo("https://musicboxd.com.br/verificar-email?token=abc_DEF-123");
 	}
 
 	private String tokenFor(String email) {
