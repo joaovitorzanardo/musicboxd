@@ -12,7 +12,7 @@ region does not exist for the api.
 | ---- | ----- |
 | Sending domain | `musicboxd.com.br` (SES domain identity, Easy DKIM, RSA 2048) |
 | From address | `no-reply@musicboxd.com.br` (no mailbox needed: the domain identity covers every address on it) |
-| Verification link | `https://musicboxd.com.br/api/v1/auth/verify?token=...`, valid 24 h, single use |
+| Verification link | `https://musicboxd.com.br/verificar-email?token=...` (SPA page that calls `GET /api/v1/auth/verify`, MBD-63), valid 24 h, single use |
 | Credentials | host role `musicboxd-host-role`, new inline policy `musicboxd-ses` (no static keys, AD-11) |
 | Host config | two new lines in `/etc/musicboxd/api.env` (section 5); SES itself is on by default in the api |
 | SES mode | **sandbox** until MBD-24: sends only to verified recipient addresses, 200 emails/24 h, 1 email/s |

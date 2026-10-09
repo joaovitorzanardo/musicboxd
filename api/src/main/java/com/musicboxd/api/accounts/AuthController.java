@@ -135,7 +135,7 @@ public class AuthController {
 		return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, RefreshCookies.clear().toString()).build();
 	}
 
-	/** The emailed link points here. MBD-22 may move the link to an SPA page that calls this same endpoint. */
+	/** Called by the SPA page the emailed link opens, /verificar-email (MBD-63). */
 	@GetMapping("/verify")
 	@ApiResponse(responseCode = "200", description = "Email verified (also when the link was already used)")
 	@ApiResponse(responseCode = "400", description = "Missing, unknown, replaced or expired token")
