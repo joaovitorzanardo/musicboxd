@@ -100,8 +100,8 @@ class AdminRouteProtectionTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.ok").value(true));
 		}
-		// Past security, an unknown admin route is an honest 404.
-		mockMvc.perform(get("/api/v1/admin/catalog/albums").header("Authorization", bearer(Role.STAFF)))
+		// Past security, an unknown admin route is an honest 404 (catalog/albums is real since MBD-28).
+		mockMvc.perform(get("/api/v1/admin/reviews/7").header("Authorization", bearer(Role.STAFF)))
 			.andExpect(status().isNotFound());
 	}
 
