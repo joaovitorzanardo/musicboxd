@@ -34,7 +34,8 @@ class CatalogContractTest {
 		assertThat(paths.get("/api/v1/admin/catalog/albums/{id}/hidden")).containsKey("put");
 		assertThat(paths.get("/api/v1/admin/catalog/songs/{id}/hidden")).containsKey("put");
 		assertThat(paths.get("/api/v1/admin/catalog/genres")).containsKey("post");
-		assertThat(paths.get("/api/v1/admin/catalog/genres/{id}")).containsKey("patch");
+		assertThat(paths.get("/api/v1/admin/catalog/genres/{id}")).containsKey("put").doesNotContainKey("patch");
+		assertThat(paths.get("/api/v1/admin/catalog/genres/{id}/hidden")).containsKey("put");
 		assertThat(paths.get("/api/v1/catalog/albums/{id}")).containsKey("get");
 		assertThat(paths.get("/api/v1/catalog/songs/{id}")).containsKey("get");
 		paths.forEach((path, operations) -> {

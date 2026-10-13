@@ -1,12 +1,15 @@
 package com.musicboxd.api.catalog;
 
+import static com.musicboxd.api.catalog.CatalogFixtures.createAlbum;
+import static com.musicboxd.api.catalog.CatalogFixtures.genre;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -19,17 +22,19 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-import com.jayway.jsonpath.JsonPath;
 import com.musicboxd.api.TestcontainersConfiguration;
 import com.musicboxd.api.accounts.Role;
 import com.musicboxd.api.accounts.TokenService;
 
+/** The admin "Gêneros" list: add, rename, hide; nothing is deleted (UX, AD-12). */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 class GenreAdminTest {
 
 	private static final String GENRES = "/api/v1/admin/catalog/genres";
+	private static final String GENRE = GENRES + "/{id}";
+	private static final String GENRE_HIDDEN = GENRE + "/hidden";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -83,11 +88,11 @@ class GenreAdminTest {
 
 	@Test
 	void staffRenamesAGenre() throws Exception {
-		String id = createdId("Rock " + UUID.randomUUID());
+		UUID id = genre(jdbc, "Rock", false);
 		String renamed = "Hard Rock " + UUID.randomUUID();
-		edit(Role.STAFF, id, "{\"name\":\"  " + renamed + "  \"}")
+		rename(Role.STAFF, id, "{\"name\":\"  " + renamed + "  \"}")
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.id").value(id))
+			.andExpect(jsonPath("$.id").value(id.toString()))
 			.andExpect(jsonPath("$.name").value(renamed))
 			.andExpect(jsonPath("$.hidden").value(false));
 		assertThat(stored(id).name()).isEqualTo(renamed);
@@ -95,76 +100,91 @@ class GenreAdminTest {
 
 	@Test
 	void renameMayChangeOnlyTheCase() throws Exception {
-		String name = "rock " + UUID.randomUUID();
-		String id = createdId(name);
-		edit(Role.STAFF, id, "{\"name\":\"" + name.toUpperCase() + "\"}")
+		UUID id = genre(jdbc, "rock", false);
+		String upper = stored(id).name().toUpperCase();
+		rename(Role.STAFF, id, "{\"name\":\"" + upper + "\"}")
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.name").value(name.toUpperCase()));
+			.andExpect(jsonPath("$.name").value(upper));
+	}
+
+	@Test
+	void renamingAHiddenGenreKeepsItHidden() throws Exception {
+		UUID id = genre(jdbc, "Axé", true);
+		rename(Role.STAFF, id, "{\"name\":\"Axé music " + UUID.randomUUID() + "\"}")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.hidden").value(true));
+		assertThat(stored(id).hidden()).isTrue();
 	}
 
 	@Test
 	void renameToAnotherGenresNameIs409AndChangesNothing() throws Exception {
-		String taken = "Jazz " + UUID.randomUUID();
-		createdId(taken);
-		String name = "Blues " + UUID.randomUUID();
-		String id = createdId(name);
-		edit(Role.STAFF, id, "{\"name\":\" " + taken.toLowerCase() + " \"}")
+		String taken = stored(genre(jdbc, "Jazz", false)).name();
+		UUID id = genre(jdbc, "Blues", false);
+		GenreView before = stored(id);
+		rename(Role.STAFF, id, "{\"name\":\" " + taken.toLowerCase() + " \"}")
 			.andExpect(status().isConflict())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("urn:musicboxd:problem:genre-taken"));
-		assertThat(stored(id).name()).isEqualTo(name);
+		assertThat(stored(id)).isEqualTo(before);
 	}
 
 	@Test
-	void staffHidesAndShowsAGenreAgain() throws Exception {
-		String name = "MPB " + UUID.randomUUID();
-		String id = createdId(name);
-
-		edit(Role.STAFF, id, "{\"hidden\":true}")
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.name").value(name))
-			.andExpect(jsonPath("$.hidden").value(true));
-		createAlbumWith(id)
-			.andExpect(status().isUnprocessableContent())
-			.andExpect(jsonPath("$.genreIds[0]").value(id));
-
-		edit(Role.STAFF, id, "{\"hidden\":false}")
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.hidden").value(false));
-		createAlbumWith(id).andExpect(status().isCreated());
-	}
-
-	@Test
-	void invalidEditsAre400AndChangeNothing() throws Exception {
-		String name = "Funk " + UUID.randomUUID();
-		String id = createdId(name);
+	void invalidRenamesAre400AndChangeNothing() throws Exception {
+		UUID id = genre(jdbc, "Funk", false);
+		GenreView before = stored(id);
 		for (String body : new String[] { "{\"name\":\"   \"}", "{\"name\":\"" + "x".repeat(51) + "\"}", "{}",
-				"{\"name\":null,\"hidden\":null}" }) {
-			edit(Role.STAFF, id, body)
+				"{\"name\":null}" }) {
+			rename(Role.STAFF, id, body)
 				.andExpect(status().isBadRequest())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 		}
-		assertThat(stored(id)).isEqualTo(new GenreView(UUID.fromString(id), name, false));
+		assertThat(stored(id)).isEqualTo(before);
+	}
+
+	/** Hidden genres leave the options for new picks (AlbumAdminTest.hiddenGenreIsRefusedWith422); shown again, they are back. */
+	@Test
+	void staffHidesAndShowsAGenreAgain() throws Exception {
+		UUID id = genre(jdbc, "MPB", false);
+
+		setHidden(Role.STAFF, id, "{\"hidden\":true}").andExpect(status().isNoContent());
+		setHidden(Role.STAFF, id, "{\"hidden\":true}").andExpect(status().isNoContent());
+		assertThat(stored(id).hidden()).isTrue();
+
+		setHidden(Role.STAFF, id, "{\"hidden\":false}").andExpect(status().isNoContent());
+		assertThat(stored(id).hidden()).isFalse();
+		createAlbum(mockMvc, tokens, List.of(id), "Águas de Março");
+	}
+
+	@Test
+	void missingHiddenIs400() throws Exception {
+		UUID id = genre(jdbc, "Forró", false);
+		setHidden(Role.STAFF, id, "{}")
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+		assertThat(stored(id).hidden()).isFalse();
 	}
 
 	@Test
 	void unknownGenreIs404AndMalformedIdIs400() throws Exception {
-		edit(Role.STAFF, UUID.randomUUID().toString(), "{\"name\":\"Anything\"}")
-			.andExpect(status().isNotFound())
-			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
-		edit(Role.STAFF, "not-a-uuid", "{\"name\":\"Anything\"}")
+		UUID unknown = UUID.randomUUID();
+		rename(Role.STAFF, unknown, "{\"name\":\"Anything\"}").andExpect(status().isNotFound());
+		setHidden(Role.STAFF, unknown, "{\"hidden\":true}").andExpect(status().isNotFound());
+		rename(Role.STAFF, "not-a-uuid", "{\"name\":\"Anything\"}")
 			.andExpect(status().isBadRequest())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 	}
 
 	@Test
-	void userTokenCannotEditAGenre() throws Exception {
-		String name = "Samba " + UUID.randomUUID();
-		String id = createdId(name);
-		edit(Role.USER, id, "{\"name\":\"Hijacked " + UUID.randomUUID() + "\",\"hidden\":true}")
+	void userTokenCannotRenameOrHideAGenre() throws Exception {
+		UUID id = genre(jdbc, "Samba", false);
+		GenreView before = stored(id);
+		rename(Role.USER, id, "{\"name\":\"Hijacked " + UUID.randomUUID() + "\"}")
 			.andExpect(status().isForbidden())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
-		assertThat(stored(id)).isEqualTo(new GenreView(UUID.fromString(id), name, false));
+		setHidden(Role.USER, id, "{\"hidden\":true}")
+			.andExpect(status().isForbidden())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+		assertThat(stored(id)).isEqualTo(before);
 	}
 
 	private ResultActions create(Role role, String body) throws Exception {
@@ -174,31 +194,23 @@ class GenreAdminTest {
 			.content(body));
 	}
 
-	private String createdId(String name) throws Exception {
-		String json = create(Role.STAFF, "{\"name\":\"" + name + "\"}")
-			.andExpect(status().isCreated())
-			.andReturn().getResponse().getContentAsString();
-		return JsonPath.read(json, "$.id");
-	}
-
-	private ResultActions edit(Role role, String id, String body) throws Exception {
-		return mockMvc.perform(patch(GENRES + "/" + id)
+	private ResultActions rename(Role role, Object id, String body) throws Exception {
+		return mockMvc.perform(put(GENRE, id)
 			.header("Authorization", StaffTokens.bearer(tokens, role))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(body));
 	}
 
-	private ResultActions createAlbumWith(String genreId) throws Exception {
-		return mockMvc.perform(post("/api/v1/admin/catalog/albums")
-			.header("Authorization", StaffTokens.bearer(tokens, Role.STAFF))
+	private ResultActions setHidden(Role role, Object id, String body) throws Exception {
+		return mockMvc.perform(put(GENRE_HIDDEN, id)
+			.header("Authorization", StaffTokens.bearer(tokens, role))
 			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"title\":\"Album\",\"artist\":\"Artist\",\"genreIds\":[\"" + genreId
-					+ "\"],\"songs\":[{\"title\":\"Song\"}]}"));
+			.content(body));
 	}
 
-	private GenreView stored(String id) {
+	private GenreView stored(UUID id) {
 		return jdbc.sql("SELECT id, name, hidden FROM catalog.genres WHERE id = :id")
-			.param("id", UUID.fromString(id))
+			.param("id", id)
 			.query(GenreView.class).single();
 	}
 

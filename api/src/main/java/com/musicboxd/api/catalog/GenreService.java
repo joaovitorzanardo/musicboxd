@@ -3,11 +3,8 @@ package com.musicboxd.api.catalog;
 import java.util.UUID;
 
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.ErrorResponseException;
 
 import com.musicboxd.api.db.Constraints;
 
@@ -33,18 +30,21 @@ class GenreService {
 		return new GenreView(id, name, false);
 	}
 
-	/** Renames, hides or shows again; a null argument is left as it is. Hidden genres keep their album links. */
 	@Transactional
-	GenreView edit(UUID id, String name, Boolean hidden) {
-		if (name == null && hidden == null) {
-			throw new ErrorResponseException(HttpStatus.BAD_REQUEST,
-					ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Send name, hidden, or both"), null);
-		}
+	GenreView rename(UUID id, String name) {
 		try {
-			return genres.update(id, name, hidden).orElseThrow(GenreNotFoundException::new);
+			return genres.rename(id, name).orElseThrow(GenreNotFoundException::new);
 		}
 		catch (DuplicateKeyException e) {
 			throw taken(e);
+		}
+	}
+
+	/** Hidden genres leave the options for new picks but stay on the albums and profiles that use them. */
+	@Transactional
+	void setHidden(UUID id, boolean hidden) {
+		if (genres.setHidden(id, hidden) == 0) {
+			throw new GenreNotFoundException();
 		}
 	}
 

@@ -28,18 +28,21 @@ class GenreRepository {
 			.update();
 	}
 
-	/** A null name or hidden leaves that column as it is. Empty when no genre has this id. */
-	Optional<GenreView> update(UUID id, String name, Boolean hidden) {
-		return jdbc.sql("""
-				UPDATE catalog.genres
-				SET name = coalesce(CAST(:name AS text), name), hidden = coalesce(CAST(:hidden AS boolean), hidden)
-				WHERE id = :id
-				RETURNING id, name, hidden""")
+	/** Empty when no genre has this id. Visibility is left as it is. */
+	Optional<GenreView> rename(UUID id, String name) {
+		return jdbc.sql("UPDATE catalog.genres SET name = :name WHERE id = :id RETURNING id, name, hidden")
 			.param("id", id)
 			.param("name", name)
-			.param("hidden", hidden)
 			.query(GenreView.class)
 			.optional();
+	}
+
+	/** Returns the rows changed: 0 means no such genre. */
+	int setHidden(UUID id, boolean hidden) {
+		return jdbc.sql("UPDATE catalog.genres SET hidden = :hidden WHERE id = :id")
+			.param("id", id)
+			.param("hidden", hidden)
+			.update();
 	}
 
 	/** Hidden genres are left out: they are no longer selectable (UX, Lista de generos). */
