@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,5 +65,13 @@ public class AlbumAdminController {
 	@ApiResponse(responseCode = "422", description = "A genre does not exist or is hidden (type urn:musicboxd:problem:unknown-genre, property genreIds)")
 	AlbumView create(@Valid @RequestBody CreateAlbumRequest request) {
 		return albums.create(request);
+	}
+
+	@GetMapping("/{id}")
+	@ApiResponse(responseCode = "200", description = "The album with every song, hidden ones included, for the editor")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	AlbumView get(@PathVariable UUID id) {
+		return albums.adminView(id);
 	}
 }

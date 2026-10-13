@@ -51,6 +51,29 @@ class AlbumService {
 				List.copyOf(songs), picked);
 	}
 
+	/** The editor's view: every song, hidden ones flagged. */
+	@Transactional(readOnly = true)
+	AlbumView adminView(UUID id) {
+		return view(id, true);
+	}
+
+	/** The Album page: visible songs only. A hidden Album still resolves (AD-12). */
+	@Transactional(readOnly = true)
+	AlbumView publicView(UUID id) {
+		return view(id, false);
+	}
+
+	@Transactional(readOnly = true)
+	SongPageView songPage(UUID id) {
+		return albums.findSongPage(id).orElseThrow(SongNotFoundException::new);
+	}
+
+	private AlbumView view(UUID id, boolean withHiddenSongs) {
+		var album = albums.findAlbum(id).orElseThrow(AlbumNotFoundException::new);
+		return new AlbumView(album.id(), album.title(), album.artist(), album.releaseYear(), album.hidden(),
+				album.createdAt(), albums.findSongs(id, withHiddenSongs), albums.findGenres(id));
+	}
+
 	/** Checked before any insert. Unknown and hidden ids are refused together. */
 	private List<GenreView> visibleGenres(List<UUID> ids) {
 		Map<UUID, GenreView> found = genres.findVisible(ids);
