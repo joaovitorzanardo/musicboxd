@@ -86,16 +86,73 @@ class AlbumRepository {
 			.single();
 	}
 
-	void insertSong(UUID id, UUID albumId, int trackNumber, String title, Integer durationSeconds) {
+	void insertSong(UUID id, UUID albumId, int trackNumber, String title, Integer durationSeconds, boolean hidden) {
 		jdbc.sql("""
-				INSERT INTO catalog.songs (id, album_id, track_number, title, duration_seconds)
-				VALUES (:id, :albumId, :trackNumber, :title, :durationSeconds)""")
+				INSERT INTO catalog.songs (id, album_id, track_number, title, duration_seconds, hidden)
+				VALUES (:id, :albumId, :trackNumber, :title, :durationSeconds, :hidden)""")
 			.param("id", id)
 			.param("albumId", albumId)
 			.param("trackNumber", trackNumber)
 			.param("title", title)
 			.param("durationSeconds", durationSeconds, Types.INTEGER)
+			.param("hidden", hidden)
 			.update();
+	}
+
+	/** Serializes concurrent edits of one album; false means no such album. */
+	boolean lockAlbum(UUID id) {
+		return jdbc.sql("SELECT id FROM catalog.albums WHERE id = :id FOR UPDATE")
+			.param("id", id)
+			.query(UUID.class)
+			.optional()
+			.isPresent();
+	}
+
+	List<UUID> songIds(UUID albumId) {
+		return jdbc.sql("SELECT id FROM catalog.songs WHERE album_id = :albumId ORDER BY track_number")
+			.param("albumId", albumId)
+			.query(UUID.class)
+			.list();
+	}
+
+	void updateAlbum(UUID id, String title, String artist, Integer releaseYear, boolean hidden) {
+		jdbc.sql("""
+				UPDATE catalog.albums
+				SET title = :title, artist = :artist, release_year = :releaseYear, hidden = :hidden, updated_at = now()
+				WHERE id = :id""")
+			.param("id", id)
+			.param("title", title)
+			.param("artist", artist)
+			.param("releaseYear", releaseYear, Types.SMALLINT)
+			.param("hidden", hidden)
+			.update();
+	}
+
+	/** Lets one transaction renumber a tracklist: (album_id, track_number) uniqueness is checked at commit. */
+	void deferTrackNumberCheck() {
+		jdbc.sql("SET CONSTRAINTS catalog.songs_album_track_key DEFERRED").update();
+	}
+
+	/** Filters on the album too: a song never changes album (AD-12). */
+	void updateSong(UUID id, UUID albumId, int trackNumber, String title, Integer durationSeconds, boolean hidden) {
+		jdbc.sql("""
+				UPDATE catalog.songs
+				SET track_number = :trackNumber, title = :title, duration_seconds = :durationSeconds,
+				    hidden = :hidden, updated_at = now()
+				WHERE id = :id AND album_id = :albumId""")
+			.param("id", id)
+			.param("albumId", albumId)
+			.param("trackNumber", trackNumber)
+			.param("title", title)
+			.param("durationSeconds", durationSeconds, Types.INTEGER)
+			.param("hidden", hidden)
+			.update();
+	}
+
+	/** Removes link rows only; genres themselves are never deleted (AD-12). */
+	void replaceGenres(UUID albumId, List<UUID> genreIds) {
+		jdbc.sql("DELETE FROM catalog.album_genres WHERE album_id = :albumId").param("albumId", albumId).update();
+		genreIds.forEach(genreId -> linkGenre(albumId, genreId));
 	}
 
 	/** Returns the rows changed: 0 means no such album. */

@@ -52,6 +52,35 @@ public class AlbumAdminController {
 		}
 	}
 
+	/** The editor's whole state (UX: "Alterações só valem depois de salvar"). Songs are listed in track order. */
+	public record UpdateAlbumRequest(
+			@NotBlank @Size(max = 200) String title,
+			@NotBlank @Size(max = 200) String artist,
+			// The upper bound (next year) needs the clock, so AlbumService checks it.
+			@Min(1000) Integer releaseYear,
+			@Size(max = 10) List<@NotNull UUID> genreIds,
+			@NotNull Boolean hidden,
+			@NotNull @Size(min = 1, max = 200) List<@NotNull @Valid TrackRequest> songs) {
+
+		public UpdateAlbumRequest {
+			title = title == null ? null : title.strip();
+			artist = artist == null ? null : artist.strip();
+			genreIds = genreIds == null ? List.of() : genreIds.stream().distinct().toList();
+		}
+	}
+
+	/** With {@code id}: an existing song of this album. Without: a new song, assigned to this album for life (AD-12). */
+	public record TrackRequest(
+			UUID id,
+			@NotBlank @Size(max = 200) String title,
+			@Min(1) @Max(86400) Integer durationSeconds,
+			@NotNull Boolean hidden) {
+
+		public TrackRequest {
+			title = title == null ? null : title.strip();
+		}
+	}
+
 	private final AlbumService albums;
 
 	AlbumAdminController(AlbumService albums) {
@@ -74,6 +103,16 @@ public class AlbumAdminController {
 	@ApiResponse(responseCode = "404", description = "No album with this id")
 	AlbumView get(@PathVariable UUID id) {
 		return albums.adminView(id);
+	}
+
+	@PutMapping("/{id}")
+	@ApiResponse(responseCode = "200", description = "Album saved: metadata, genres, visibility and tracklist, all or nothing")
+	@ApiResponse(responseCode = "400", description = "Invalid title, artist, year, hidden, songs or genre list")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	@ApiResponse(responseCode = "422", description = "A new genre does not exist or is hidden (type urn:musicboxd:problem:unknown-genre), or the tracklist leaves out, repeats or borrows a song (type urn:musicboxd:problem:tracklist-mismatch)")
+	AlbumView update(@PathVariable UUID id, @Valid @RequestBody UpdateAlbumRequest request) {
+		return albums.update(id, request);
 	}
 
 	@PutMapping("/{id}/hidden")
