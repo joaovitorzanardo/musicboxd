@@ -32,3 +32,7 @@
   summary: Fill the verification tables still marked TODO in docs/runbooks/runbook-aws-host.md, runbook-mbd-10-cd-setup.md, runbook-mbd-10-cd-verify.md and runbook-mbd-11-postgres-backups.md.
   evidence: Needs live-host evidence (resource IDs, run results) only the operator has.
   status: open (operator)
+- source_plan: `docs/superpowers/plans/2026-10-13-mbd-29-edit-and-hide-albums-and-songs.md`
+  summary: Admin catalog list endpoint (GET /api/v1/admin/catalog/albums with a text filter, hidden albums included) for the admin "Catálogo" table ("Filtrar catálogo", "8 de 214 álbuns").
+  evidence: Not in MBD-29's acceptance criteria; left out by the user's choice on 2026-10-13. The admin SPA cannot list albums without it.
+  status: open -> MBD-53 (admin SPA)

@@ -4,7 +4,10 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -49,6 +52,35 @@ public class AlbumAdminController {
 		}
 	}
 
+	/** The editor's whole state (UX: "Alterações só valem depois de salvar"). Songs are listed in track order. */
+	public record UpdateAlbumRequest(
+			@NotBlank @Size(max = 200) String title,
+			@NotBlank @Size(max = 200) String artist,
+			// The upper bound (next year) needs the clock, so AlbumService checks it.
+			@Min(1000) Integer releaseYear,
+			@Size(max = 10) List<@NotNull UUID> genreIds,
+			@NotNull Boolean hidden,
+			@NotNull @Size(min = 1, max = 200) List<@NotNull @Valid TrackRequest> songs) {
+
+		public UpdateAlbumRequest {
+			title = title == null ? null : title.strip();
+			artist = artist == null ? null : artist.strip();
+			genreIds = genreIds == null ? List.of() : genreIds.stream().distinct().toList();
+		}
+	}
+
+	/** With {@code id}: an existing song of this album. Without: a new song, assigned to this album for life (AD-12). */
+	public record TrackRequest(
+			UUID id,
+			@NotBlank @Size(max = 200) String title,
+			@Min(1) @Max(86400) Integer durationSeconds,
+			@NotNull Boolean hidden) {
+
+		public TrackRequest {
+			title = title == null ? null : title.strip();
+		}
+	}
+
 	private final AlbumService albums;
 
 	AlbumAdminController(AlbumService albums) {
@@ -63,5 +95,33 @@ public class AlbumAdminController {
 	@ApiResponse(responseCode = "422", description = "A genre does not exist or is hidden (type urn:musicboxd:problem:unknown-genre, property genreIds)")
 	AlbumView create(@Valid @RequestBody CreateAlbumRequest request) {
 		return albums.create(request);
+	}
+
+	@GetMapping("/{id}")
+	@ApiResponse(responseCode = "200", description = "The album with every song, hidden ones included, for the editor")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	AlbumView get(@PathVariable UUID id) {
+		return albums.adminView(id);
+	}
+
+	@PutMapping("/{id}")
+	@ApiResponse(responseCode = "200", description = "Album saved: metadata, genres, visibility and tracklist, all or nothing")
+	@ApiResponse(responseCode = "400", description = "Invalid title, artist, year, hidden, songs or genre list")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	@ApiResponse(responseCode = "422", description = "A new genre does not exist or is hidden (type urn:musicboxd:problem:unknown-genre), or the tracklist leaves out, repeats or borrows a song (type urn:musicboxd:problem:tracklist-mismatch)")
+	AlbumView update(@PathVariable UUID id, @Valid @RequestBody UpdateAlbumRequest request) {
+		return albums.update(id, request);
+	}
+
+	@PutMapping("/{id}/hidden")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@ApiResponse(responseCode = "204", description = "Visibility set; a hidden album leaves search but still opens by id")
+	@ApiResponse(responseCode = "400", description = "hidden missing")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	void setHidden(@PathVariable UUID id, @Valid @RequestBody VisibilityRequest request) {
+		albums.setAlbumHidden(id, request.hidden());
 	}
 }

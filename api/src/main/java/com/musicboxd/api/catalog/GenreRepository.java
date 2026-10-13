@@ -39,4 +39,22 @@ class GenreRepository {
 			.stream()
 			.collect(Collectors.toMap(GenreView::id, Function.identity()));
 	}
+
+	/** For an edit: visible genres, plus hidden ones this album already carries (hiding keeps existing uses, UX "Lista de generos"). */
+	Map<UUID, GenreView> findSelectableFor(UUID albumId, Collection<UUID> ids) {
+		if (ids.isEmpty()) {
+			return Map.of();
+		}
+		return jdbc.sql("""
+				SELECT g.id, g.name, g.hidden FROM catalog.genres g
+				WHERE g.id IN (:ids)
+				  AND (NOT g.hidden OR EXISTS (
+				      SELECT 1 FROM catalog.album_genres ag WHERE ag.album_id = :albumId AND ag.genre_id = g.id))""")
+			.param("ids", ids)
+			.param("albumId", albumId)
+			.query(GenreView.class)
+			.list()
+			.stream()
+			.collect(Collectors.toMap(GenreView::id, Function.identity()));
+	}
 }
