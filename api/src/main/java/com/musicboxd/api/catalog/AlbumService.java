@@ -68,6 +68,20 @@ class AlbumService {
 		return albums.findSongPage(id).orElseThrow(SongNotFoundException::new);
 	}
 
+	@Transactional
+	void setAlbumHidden(UUID id, boolean hidden) {
+		if (albums.setAlbumHidden(id, hidden) == 0) {
+			throw new AlbumNotFoundException();
+		}
+	}
+
+	@Transactional
+	void setSongHidden(UUID id, boolean hidden) {
+		if (albums.setSongHidden(id, hidden) == 0) {
+			throw new SongNotFoundException();
+		}
+	}
+
 	private AlbumView view(UUID id, boolean withHiddenSongs) {
 		var album = albums.findAlbum(id).orElseThrow(AlbumNotFoundException::new);
 		return new AlbumView(album.id(), album.title(), album.artist(), album.releaseYear(), album.hidden(),

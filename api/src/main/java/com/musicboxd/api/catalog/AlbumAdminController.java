@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -73,5 +74,15 @@ public class AlbumAdminController {
 	@ApiResponse(responseCode = "404", description = "No album with this id")
 	AlbumView get(@PathVariable UUID id) {
 		return albums.adminView(id);
+	}
+
+	@PutMapping("/{id}/hidden")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@ApiResponse(responseCode = "204", description = "Visibility set; a hidden album leaves search but still opens by id")
+	@ApiResponse(responseCode = "400", description = "hidden missing")
+	@ApiResponse(responseCode = "403", description = "Caller is not Staff")
+	@ApiResponse(responseCode = "404", description = "No album with this id")
+	void setHidden(@PathVariable UUID id, @Valid @RequestBody VisibilityRequest request) {
+		albums.setAlbumHidden(id, request.hidden());
 	}
 }

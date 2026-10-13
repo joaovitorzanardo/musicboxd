@@ -98,6 +98,22 @@ class AlbumRepository {
 			.update();
 	}
 
+	/** Returns the rows changed: 0 means no such album. */
+	int setAlbumHidden(UUID id, boolean hidden) {
+		return jdbc.sql("UPDATE catalog.albums SET hidden = :hidden, updated_at = now() WHERE id = :id")
+			.param("id", id)
+			.param("hidden", hidden)
+			.update();
+	}
+
+	/** Returns the rows changed: 0 means no such song. */
+	int setSongHidden(UUID id, boolean hidden) {
+		return jdbc.sql("UPDATE catalog.songs SET hidden = :hidden, updated_at = now() WHERE id = :id")
+			.param("id", id)
+			.param("hidden", hidden)
+			.update();
+	}
+
 	void linkGenre(UUID albumId, UUID genreId) {
 		jdbc.sql("INSERT INTO catalog.album_genres (album_id, genre_id) VALUES (:albumId, :genreId)")
 			.param("albumId", albumId)
