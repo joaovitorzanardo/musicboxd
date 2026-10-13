@@ -2,6 +2,7 @@ package com.musicboxd.api.catalog;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -24,6 +25,23 @@ class GenreRepository {
 		jdbc.sql("INSERT INTO catalog.genres (id, name) VALUES (:id, :name)")
 			.param("id", id)
 			.param("name", name)
+			.update();
+	}
+
+	/** Empty when no genre has this id. Visibility is left as it is. */
+	Optional<GenreView> rename(UUID id, String name) {
+		return jdbc.sql("UPDATE catalog.genres SET name = :name WHERE id = :id RETURNING id, name, hidden")
+			.param("id", id)
+			.param("name", name)
+			.query(GenreView.class)
+			.optional();
+	}
+
+	/** Returns the rows changed: 0 means no such genre. */
+	int setHidden(UUID id, boolean hidden) {
+		return jdbc.sql("UPDATE catalog.genres SET hidden = :hidden WHERE id = :id")
+			.param("id", id)
+			.param("hidden", hidden)
 			.update();
 	}
 
