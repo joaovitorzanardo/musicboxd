@@ -2,6 +2,7 @@ package com.musicboxd.api.catalog;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -25,6 +26,20 @@ class GenreRepository {
 			.param("id", id)
 			.param("name", name)
 			.update();
+	}
+
+	/** A null name or hidden leaves that column as it is. Empty when no genre has this id. */
+	Optional<GenreView> update(UUID id, String name, Boolean hidden) {
+		return jdbc.sql("""
+				UPDATE catalog.genres
+				SET name = coalesce(CAST(:name AS text), name), hidden = coalesce(CAST(:hidden AS boolean), hidden)
+				WHERE id = :id
+				RETURNING id, name, hidden""")
+			.param("id", id)
+			.param("name", name)
+			.param("hidden", hidden)
+			.query(GenreView.class)
+			.optional();
 	}
 
 	/** Hidden genres are left out: they are no longer selectable (UX, Lista de generos). */
