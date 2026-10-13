@@ -36,3 +36,7 @@
   summary: Admin catalog list endpoint (GET /api/v1/admin/catalog/albums with a text filter, hidden albums included) for the admin "Catálogo" table ("Filtrar catálogo", "8 de 214 álbuns").
   evidence: Not in MBD-29's acceptance criteria; left out by the user's choice on 2026-10-13. The admin SPA cannot list albums without it.
   status: open -> MBD-53 (admin SPA)
+- source_plan: `docs/superpowers/plans/2026-10-13-mbd-30-align-with-mbd-29.md`
+  summary: Admin genre list endpoint (GET /api/v1/admin/catalog/genres, hidden genres included, each with its album count) for the admin "Gêneros" screen ("{n} álbuns", "Ativo").
+  evidence: Not in MBD-30's acceptance criteria; dropped to match MBD-29's deferral of the admin album list. The admin SPA cannot list genres without it. The index catalog.album_genres_genre_idx already exists for the count.
+  status: open -> MBD-53 (admin SPA)

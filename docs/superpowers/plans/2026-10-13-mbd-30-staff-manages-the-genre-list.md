@@ -1,5 +1,7 @@
 # MBD-30 Staff Manages the Genre List — Implementation Plan
 
+> **Superseded in part (2026-10-13):** after MBD-29 merged, `docs/superpowers/plans/2026-10-13-mbd-30-align-with-mbd-29.md` replaced the `PATCH` with `PUT /{id}` + `PUT /{id}/hidden` and dropped the admin `GET` list (deferred to MBD-53).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Staff can manage the controlled genre list. `PATCH /api/v1/admin/catalog/genres/{id}` renames, hides or shows a genre again. `GET /api/v1/admin/catalog/genres` lists every genre with its album count. MBD-28 already added `POST` for creating genres. A USER token gets 403 on all of them.
